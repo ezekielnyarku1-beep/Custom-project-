@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Overview</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&amp;display=swap" />
+  </head>
+  <body>
+    <main id="root"></main>
+    <template id="auth">
+      <aside class="brand">
+        <strong class="wordmark"></strong>
+        <div>
+          <p class="tagline">A LITTLE SPACE FOR BIG IDEAS</p>
+          <p class="headline">Make room<br />for what's<br /><span>next.</span></p>
+        </div>
+        <p class="brand-note">Your ideas, your projects, your next big thing. Sign in and pick up where you left off.</p>
+      </aside>
+      <section class="form-panel">
+        <div class="form-content">
+          <h1></h1>
+          <p class="subtitle"></p>
+          <form novalidate>
+            <button type="submit"></button>
+          </form>
+          <p class="form-footer"></p>
+        </div>
+      </section>
+    </template>
+    <template id="field">
+      <div class="field">
+        <label></label>
+        <div class="input-wrap"><input required /></div>
+        <small role="alert" hidden></small>
+      </div>
+    </template>
+    <template id="dashboard">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <strong class="wordmark"></strong>
+          <button class="menu-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="sidebar-menu">
+            <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="sidebar-menu" id="sidebar-menu">
+          <div class="workspace"><strong>Personal workspace</strong><small>Free plan</small></div>
+          <nav aria-label="Workspace">
+            <button class="nav-link" data-view="Home"><span aria-hidden="true">⌂</span>Home</button>
+            <button class="nav-link" data-view="All projects"><span aria-hidden="true">□</span>All projects</button>
+            <button class="nav-link" data-view="Starred"><span aria-hidden="true">☆</span>Starred</button>
+          </nav>
+          <div class="space-summary"><p class="eyebrow">Your space</p><p>Private projects <span id="project-count"></span></p></div>
+          <div class="sidebar-note"><strong>Big ideas start small.</strong><p>Create a project to give your next idea a home.</p></div>
+          <button class="nav-link" id="logout"><span aria-hidden="true">↪</span>Log out</button>
+        </div>
+      </aside>
+      <div class="dashboard-main">
+        <header class="topbar">
+          <p class="breadcrumb">Workspace <span>/</span> <strong id="current-view">Home</strong></p>
+          <label class="search"><span aria-hidden="true">⌕</span><input id="project-search" type="search" aria-label="Search your projects" placeholder="Search your projects" /></label>
+          <span class="account">Personal account</span>
+        </header>
+        <div class="dashboard-content">
+          <div class="section-heading"><div><h1>Welcome back.</h1><p class="subtitle">A fresh start. A familiar space. Let's make something happen.</p></div><button id="new-project"><span aria-hidden="true">＋</span> New project</button></div>
+          <p id="storage-notice" class="notice" role="status" hidden>Browser storage is unavailable. Your changes will last only while this page is open.</p>
+          <dl class="project-summary" aria-label="Project summary"></dl>
+          <section class="project-banner">
+            <div><p class="eyebrow">Pick up where you left off</p><h2>Your next big thing is waiting.</h2><p id="featured-description"></p></div>
+            <button class="mint-button" id="open-project">Open project</button>
+          </section>
+          <section class="projects-section" aria-labelledby="projects-heading">
+            <div class="section-heading"><h2 id="projects-heading" tabindex="-1">Recent projects</h2><button class="text-button" id="view-all-projects" type="button" data-view="All projects">View all projects</button></div>
+            <div class="cards"></div>
+            <p id="empty-projects" role="status" hidden></p>
+          </section>
+          <section class="activity-section" aria-labelledby="activity-heading">
+            <div class="section-heading"><h2 id="activity-heading">Recent activity</h2></div>
+            <div class="activity-list"></div>
+          </section>
+        </div>
+      </div>
+      <dialog aria-labelledby="dialog-title">
+        <div class="section-heading"><h2 id="dialog-title"></h2><button class="text-button" id="close-dialog" aria-label="Close dialog">Close</button></div>
+        <div id="dialog-content"></div>
+      </dialog>
+    </template>
+    <template id="project-card">
+      <article class="card">
+        <div class="section-heading"><span class="folder-icon" aria-hidden="true"></span><button class="star-button" aria-pressed="false"></button></div>
+        <h3><button class="project-title"></button></h3>
+        <p class="project-description"></p>
+        <div class="card-footer"><span class="status"></span><small></small></div>
+      </article>
+    </template>
+    <template id="activity-row">
+      <div class="activity-row"><span aria-hidden="true">◷</span><strong></strong><p></p><small></small></div>
+    </template>
+    <script defer src="./src/validate.js"></script>
+    <script defer src="./app.js"></script>
+  </body>
+</html>

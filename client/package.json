@@ -1,0 +1,17 @@
+{
+  "name": "clearinghub-client",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5173 --strictPort",
+    "build": "node -e \"const fs = require('node:fs'); for (const file of ['index.html', 'app.js', 'src/validate.js', 'src/styles.css']) { const target = 'dist/' + file; fs.mkdirSync(require('node:path').dirname(target), { recursive: true }); fs.copyFileSync(file, target); }\""
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.5"
+  },
+  "devDependencies": {
+    "vite": "^6.4.1"
+  }
+}
