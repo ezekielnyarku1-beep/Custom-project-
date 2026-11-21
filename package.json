@@ -10,6 +10,7 @@
   "type": "module",
   "scripts": {
     "build": "esbuild src/server.mjs --bundle --platform=node --format=esm --packages=external --outfile=dist/server.mjs",
-    "start": "node dist/server.mjs"
+    "start": "node dist/server.mjs",
+    "test": "node --test"
   }
 }
