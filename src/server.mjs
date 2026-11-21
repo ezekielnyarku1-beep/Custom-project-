@@ -1,5 +1,7 @@
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { resolve, extname } from "node:path";
 import { loadEnvFile } from "node:process";
 import pg from "pg";
 import { api, fail } from "./api.mjs";
@@ -9,6 +11,8 @@ for (const file of [".env", ".env.local"]) {
 }
 
 const connectionString = process.env.DATABASE_URL;
+const clientRoot = resolve("client");
+const contentTypes = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
 if (!connectionString) {
   throw new Error("DATABASE_URL is required.");
 }
@@ -33,6 +37,15 @@ const server = createServer(async (request, response) => {
   let health = false;
   try {
     const path = new URL(request.url, "http://localhost").pathname;
+    if (request.method === "GET" && !path.startsWith("/api/") && path !== "/health") {
+      const file = resolve(clientRoot, path === "/" ? "index.html" : path.slice(1));
+      const type = contentTypes[extname(file)];
+      if (!type) fail(404, "File not found");
+      let contents;
+      try { contents = await readFile(file); } catch { fail(404, "File not found"); }
+      response.writeHead(200, { "Content-Type": type + "; charset=utf-8", "Cache-Control": "no-cache" }).end(contents);
+      return;
+    }
     health = request.method === "GET" && path === "/health";
     if (health) {
       const { rows } = await database.query("SELECT 1 AS result");
