@@ -1,9 +1,3 @@
-const projectTones = {
-  "In progress": "blue",
-  Planning: "amber",
-  Collecting: "green",
-};
-
 function validate({ fullName, email, password, confirmPassword, projectName }) {
   const errors = {};
 
@@ -23,14 +17,4 @@ function validate({ fullName, email, password, confirmPassword, projectName }) {
     errors.confirmPassword = "Passwords must match.";
   }
   return errors;
-}
-
-function validProjects(value) {
-  return Array.isArray(value) && value.length > 0 && value.every(project =>
-    project && typeof project.name === "string" && project.name.trim() &&
-    typeof project.description === "string" && typeof project.time === "string" &&
-    Object.hasOwn(projectTones, project.status) &&
-    (project.activity === undefined || typeof project.activity === "string") &&
-    (project.starred === undefined || typeof project.starred === "boolean")
-  );
 }

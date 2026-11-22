@@ -1,105 +1,11 @@
 const root = document.querySelector("#root");
-const appName = document.title;
-const projectStorageKey = "overviewProjects";
-let loggedIn = false;
-let storageAvailable = true;
-let renderSequence = 0;
-
-function skeleton(variant) {
-  const element = document.createElement("span");
-  element.className = "skeleton skeleton-" + variant;
-  element.setAttribute("aria-hidden", "true");
-  return element;
-}
-
-function renderAuthSkeleton(fieldNames) {
-  const brand = root.querySelector(".brand");
-  brand.replaceChildren(skeleton("brand-name"));
-  const brandCopy = document.createElement("div");
-  brandCopy.className = "skeleton-brand-copy";
-  brandCopy.append(skeleton("tagline"));
-  const headline = document.createElement("div");
-  headline.className = "skeleton-headline";
-  headline.append(skeleton("headline-line"), skeleton("headline-line"), skeleton("headline-short"));
-  brandCopy.append(headline);
-  brand.append(brandCopy, skeleton("note"));
-  const content = root.querySelector(".form-content");
-  const fieldsContainer = content.querySelector("form");
-  fieldsContainer.replaceChildren();
-  fieldNames.forEach(() => {
-    const field = document.createElement("div");
-    field.className = "field";
-    field.append(skeleton("label"), skeleton("input"));
-    fieldsContainer.append(field);
-  });
-  fieldsContainer.append(skeleton("button"));
-  content.replaceChildren(skeleton("heading"), skeleton("subtitle"), fieldsContainer);
-}
-
-function renderDashboardSkeleton() {
-  const sidebar = root.querySelector(".sidebar");
-  const nav = document.createElement("div");
-  nav.className = "skeleton-nav";
-  sidebar.replaceChildren(skeleton("brand-name"), skeleton("workspace"), nav);
-  for (let index = 0; index < 3; index += 1) nav.append(skeleton("nav"));
-  root.querySelector(".topbar").replaceChildren(skeleton("breadcrumb"), skeleton("search"));
-  const dashboardContent = root.querySelector(".dashboard-content");
-  const heading = dashboardContent.querySelector(".section-heading");
-  const headingGroup = document.createElement("div");
-  headingGroup.className = "skeleton-heading-group";
-  headingGroup.append(skeleton("heading"), skeleton("subtitle"));
-  heading.replaceChildren(headingGroup, skeleton("button-small"));
-  const summary = dashboardContent.querySelector(".project-summary");
-  for (let index = 0; index < 3; index += 1) {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.append(skeleton("summary-label"), skeleton("summary-value"));
-    summary.append(card);
-  }
-  const banner = dashboardContent.querySelector(".project-banner");
-  banner.replaceWith(skeleton("project-banner"));
-  const projects = dashboardContent.querySelector(".projects-section");
-  const cards = projects.querySelector(".cards");
-  for (let index = 0; index < 3; index += 1) {
-    const card = document.createElement("div");
-    card.className = "card skeleton-card";
-    card.append(skeleton("icon"), skeleton("title"), skeleton("description"));
-    const footer = document.createElement("div");
-    footer.className = "card-footer";
-    footer.append(skeleton("status"), skeleton("status"));
-    card.append(footer);
-    cards.append(card);
-  }
-  projects.replaceChildren(skeleton("heading-small"), cards);
-  const activity = dashboardContent.querySelector(".activity-section");
-  const activityList = activity.querySelector(".activity-list");
-  for (let index = 0; index < 2; index += 1) {
-    const row = document.createElement("div");
-    row.className = "activity-row";
-    row.append(skeleton("icon"), skeleton("activity-name"), skeleton("activity-description"), skeleton("activity-time"));
-    activityList.append(row);
-  }
-  activity.replaceChildren(skeleton("heading-small"), activityList);
-}
-
-function store(key, value, fallback) {
-  const result = value === undefined ? fallback : value;
-  if (!storageAvailable) return result;
-  try {
-    if (value === undefined) return JSON.parse(localStorage.getItem(key)) ?? fallback;
-    if (value === null) localStorage.removeItem(key);
-    else localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    storageAvailable = false;
-  }
-  return result;
-}
-
-function session(value) {
-  loggedIn = store("loggedIn", value, loggedIn) === true;
-  return loggedIn;
-}
 const pages = {
+  "reset-password": {
+    title: "Reset password",
+    subtitle: "Choose a new password for your account.",
+    fields: ["password", "confirmPassword"],
+    action: "Reset password",
+  },
   login: {
     title: "Welcome back",
     subtitle: "Enter your details to sign in to your account.",
@@ -124,24 +30,13 @@ const fields = {
   fullName: ["Full name", "text", "Your full name", "name"],
   email: ["Email address", "email", "you@example.com", "email"],
   password: ["Password", "password", "Enter your password", "current-password"],
-  confirmPassword: ["Confirm password", "password", "Repeat your password", "new-password"],
-  projectName: ["Project name", "text", "Name your project", "off"],
+  confirmPassword: [
+    "Confirm password",
+    "password",
+    "Repeat your password",
+    "new-password",
+  ],
 };
-
-const projects = [
-  { name: "Website refresh", description: "A new home for a fresh perspective.", status: "In progress", time: "2 hours ago", activity: "You updated the project overview." },
-  { name: "Product launch", description: "Everything you need for the big day.", status: "Planning", time: "Yesterday", activity: "You created a new project." },
-  { name: "Ideas & inspiration", description: "A little space for your next big idea.", status: "Collecting", time: "2 days ago" },
-];
-
-const savedProjects = store(projectStorageKey);
-if (validProjects(savedProjects)) {
-  projects.splice(0, projects.length, ...savedProjects.map(({ tone, ...project }) => project));
-}
-
-function saveProjects() {
-  store(projectStorageKey, projects);
-}
 
 function template(id) {
   return document.getElementById(id).content.cloneNode(true);
@@ -154,13 +49,6 @@ function link(page, text) {
   return anchor;
 }
 
-function projectTime(project) {
-  const date = new Date(project.time);
-  return Number.isNaN(date.getTime()) ? project.time : date.toLocaleString(undefined, {
-    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-  });
-}
-
 function field(name, page) {
   const fragment = template("field");
   const label = fragment.querySelector("label");
@@ -171,7 +59,8 @@ function field(name, page) {
   label.textContent = caption;
   label.htmlFor = name;
   Object.assign(input, { id: name, name, type, placeholder, autocomplete });
-  if (name === "password" && page === "signup") input.autocomplete = "new-password";
+  if (name === "password" && page === "signup")
+    input.autocomplete = "new-password";
   error.id = name + "-error";
   input.setAttribute("aria-describedby", error.id);
   if (type === "email") {
@@ -190,7 +79,10 @@ function field(name, page) {
       const visible = input.type === "password";
       input.type = visible ? "text" : "password";
       toggle.textContent = visible ? "Hide" : "Show";
-      toggle.setAttribute("aria-label", toggle.textContent + " " + caption.toLowerCase());
+      toggle.setAttribute(
+        "aria-label",
+        toggle.textContent + " " + caption.toLowerCase(),
+      );
       toggle.setAttribute("aria-pressed", String(visible));
     };
     input.classList.add("password-input");
@@ -202,7 +94,9 @@ function field(name, page) {
 function showErrors(form, errors, focus = true) {
   for (const input of form.querySelectorAll("input")) {
     const message = errors[input.name] || "";
-    const error = document.getElementById(input.getAttribute("aria-describedby"));
+    const error = document.getElementById(
+      input.getAttribute("aria-describedby"),
+    );
     input.setAttribute("aria-invalid", String(Boolean(message)));
     error.hidden = !message;
     error.textContent = message;
@@ -227,23 +121,6 @@ function setButtonLoading(button) {
   button.append(spinner, "Loading...");
 }
 
-function renderScreen(layout, showLoading, showContent, delay) {
-  const sequence = ++renderSequence;
-  root.className = layout;
-  root.setAttribute("aria-busy", "true");
-  root.setAttribute("aria-label", "Loading");
-  root.replaceChildren(template(layout));
-  showLoading();
-  window.setTimeout(() => {
-    if (sequence !== renderSequence) return;
-    root.replaceChildren(template(layout));
-    for (const wordmark of root.querySelectorAll(".wordmark")) wordmark.textContent = appName;
-    showContent();
-    root.removeAttribute("aria-busy");
-    root.removeAttribute("aria-label");
-  }, delay);
-}
-
 function renderAuthContent(page) {
   const { title, subtitle, fields, action } = pages[page];
   root.querySelector("h1").textContent = title;
@@ -263,205 +140,1354 @@ function renderAuthContent(page) {
     footer.append(link("login", "Back to login"));
   }
 
-  form.onsubmit = event => {
+  form.onsubmit = async (event) => {
     event.preventDefault();
-    if (button.disabled) return;
-    if (!validateForm(form)) return;
+    const values = validateForm(form);
+    if (!values || button.disabled) return;
     setButtonLoading(button);
-    window.setTimeout(() => {
+    try {
+      await request("auth/" + page, { ...values, token: route()[1] });
       if (!form.isConnected) return;
-      if (page === "forgot-password") {
-        const status = document.createElement("p");
-        status.setAttribute("role", "status");
-        form.replaceWith(status);
-        status.textContent = "If this email exists, we sent a reset link.";
-      } else {
-        session(true);
-        location.hash = "/dashboard";
+      if (page === "forgot-password")
+        form.textContent =
+          "If the address matches an account, a reset link will arrive by email.";
+      else if (page === "reset-password") location.hash = "/login";
+      else {
+        state = null;
+        location.hash = "/home";
       }
-    }, 700);
-  };
-  form.oninput = () => {
-    if (form.querySelector('[aria-invalid="true"]')) {
-      validateForm(form, false);
+    } catch (error) {
+      showError(form, error);
+    } finally {
+      button.disabled = false;
+      button.classList.remove("button-loading");
+      button.textContent = action;
     }
   };
 }
 
-function renderDashboardContent() {
-  let view = "Home";
-  const cards = root.querySelector(".cards");
-  const search = root.querySelector("#project-search");
-  const projectsHeading = root.querySelector("#projects-heading");
-  const viewAll = root.querySelector("#view-all-projects");
-  const emptyProjects = root.querySelector("#empty-projects");
-  const dialog = root.querySelector("dialog");
-  const content = root.querySelector("#dialog-content");
-  const menu = root.querySelector("#sidebar-menu");
-  const menuToggle = root.querySelector(".menu-toggle");
-
-  function setMenu(open) {
-    if (!open && menu.contains(document.activeElement) && menuToggle.getClientRects().length) {
-      menuToggle.focus();
-    }
-    menuToggle.setAttribute("aria-expanded", String(open));
-    menuToggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
-    menu.classList.toggle("is-open", open);
-  }
-
-  menuToggle.onclick = () => setMenu(menuToggle.getAttribute("aria-expanded") !== "true");
-  root.querySelector(".sidebar").onkeydown = event => {
-    if (event.key === "Escape") setMenu(false);
-  };
-
-  function openDialog(title) {
-    root.querySelector("#dialog-title").textContent = title;
-    content.replaceChildren();
-    dialog.showModal();
-  }
-
-  function openProject(project) {
-    openDialog(project.name);
-    const description = document.createElement("p");
-    description.textContent = project.description || "No description added.";
-    const status = document.createElement("p");
-    status.textContent = "Status: " + project.status;
-    content.append(description, status);
-  }
-
-  function updateProjects(focusedProject) {
-    cards.replaceChildren();
-    const query = search.value.trim().toLowerCase();
-    const matches = projects.filter(project =>
-      (view !== "Starred" || project.starred) &&
-      (project.name + " " + project.description).toLowerCase().includes(query)
+function showError(container, error) {
+  container.querySelector("[data-error]")?.remove();
+  const p = document.createElement("p");
+  p.dataset.error = "";
+  p.setAttribute("role", "alert");
+  p.textContent = error.message;
+  container.prepend(p);
+}
+async function request(path, data) {
+  const response = await fetch(
+    "/api/" + path,
+    data === undefined
+      ? {}
+      : {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        },
+  );
+  const result = await response.json();
+  if (!response.ok)
+    throw Object.assign(new Error(result.error ?? "Request failed"), {
+      status: response.status,
+    });
+  return result;
+}
+const labels = {
+  home: "Home",
+  projects: "Projects",
+  "my-tasks": "My Tasks",
+  teams: "Teams",
+  activity: "Activity",
+  notifications: "Notifications",
+  settings: "Settings",
+};
+const descriptions = {
+  home: "Here’s what’s happening across your projects today.",
+  projects: "Track tasks, owners, and deadlines.",
+  "my-tasks": "Everything assigned to you, all in one place.",
+  teams: "Manage members, roles, and project access.",
+  activity: "Task changes, comments, and work updates.",
+  notifications: "Important updates and conversations that involve you.",
+  settings: "Manage your personal account and workspace preferences.",
+};
+const stages = ["To do", "In progress", "In review", "Done"];
+const priorities = ["Nice to Have", "Should Have", "Must Have"];
+const priorityLabels = {
+  "Nice to Have": "Low",
+  "Should Have": "Medium",
+  "Must Have": "High",
+};
+let state,
+  filters = {},
+  lastRoute = "",
+  version = 0;
+const route = () => location.hash.replace(/^#\/?/, "").split("/");
+const page = () => (Object.hasOwn(labels, route()[0]) ? route()[0] : "home");
+const managing = () => state.user.role !== "Member";
+const byId = (rows, id) => rows.find((item) => item.id === id);
+const projectTasks = (id) => state.tasks.filter((t) => t.project_id === id);
+const tasksDone = (tasks) => tasks.filter((t) => t.stage === "Done").length;
+const progress = (id) => {
+  const percent = byId(state.projects, id)?.percent;
+  if (percent != null) return Math.round(percent);
+  const rows = projectTasks(id);
+  return rows.length ? Math.round((100 * tasksDone(rows)) / rows.length) : 0;
+};
+const projectStatus = (id) => {
+  const rows = projectTasks(id);
+  const percent = byId(state.projects, id)?.percent;
+  return rows.length &&
+    (percent == null ? tasksDone(rows) === rows.length : percent === 100)
+    ? "Completed"
+    : progress(id) > 0 || rows.some((t) => t.stage !== "To do")
+      ? "In progress"
+      : "Planning";
+};
+const day = (offset = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0"),
+  ].join("-");
+};
+const overdue = (t) => t.due_date && t.due_date < day() && t.stage !== "Done";
+const date = (v) =>
+  v
+    ? new Date(v.length === 10 ? v + "T12:00:00" : v).toLocaleDateString(
+        undefined,
+        { month: "short", day: "numeric", year: "numeric" },
+      )
+    : "No deadline";
+const when = (v) =>
+  new Date(v).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+const esc = (value) =>
+  String(value ?? "").replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );
+const action = (id, label, key = "", cls = "") =>
+  `<button type="button" class="${cls}" data-action="${id}" data-id="${esc(key)}">${esc(label)}</button>`;
+const anchor = (path, label, cls = "") =>
+  `<a class="${cls}" href="#/${esc(path)}">${esc(label)}</a>`;
+const none = (text) => `<p class="empty">${esc(text)}</p>`;
+const panel = (title, html) =>
+  `<section class="block"><h2>${esc(title)}</h2>${html}</section>`;
+const stats = (items) =>
+  `<dl class="project-summary">${items.map(([label, value]) => `<div class="card"><dt>${esc(label)}</dt><dd>${value}</dd></div>`).join("")}</dl>`;
+const table = (headers, rows, empty) =>
+  rows.length
+    ? `<div class="table-scroll" tabindex="0" role="region" aria-label="Scrollable table"><table><thead><tr>${headers.map((h) => `<th scope="col">${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`
+    : none(empty);
+const options = (pairs, selected) =>
+  pairs
+    .map((pair) => {
+      const [v, label] = Array.isArray(pair) ? pair : [pair, pair];
+      return `<option value="${esc(v)}" ${v === selected ? "selected" : ""}>${esc(label)}</option>`;
+    })
+    .join("");
+const filter = (key, label, pairs) =>
+  `<label class="filter">${esc(label)} <select data-filter="${key}">${options([["", "All"], ...pairs], filters[key] ?? "")}</select></label>`;
+const tabs = (key, values) =>
+  `<div class="tabs">${values.map(([v, label]) => `<button data-filter-key="${key}" data-value="${esc(v)}" aria-pressed="${(filters[key] ?? "") === v}">${esc(label)}</button>`).join("")}</div>`;
+const projectPairs = () => state.projects.map((p) => [p.id, p.name]);
+const eligible = (id) =>
+  state.members.filter((m) => m.role !== "Member" || m.projects.includes(id));
+function projectCards(rows) {
+  if (!rows.length) return none("No projects to show.");
+  return `<div class="cards">${rows.map((p) => `<article class="card"><div class="section-heading"><span class="folder-icon" aria-hidden="true"></span><button class="star-button" data-action="star" data-id="${p.id}" aria-pressed="${p.starred}" aria-label="Star ${esc(p.name)}">${p.starred ? "★" : "☆"}</button></div><h3>${anchor("projects/" + p.id, p.name)}</h3><p class="project-description">${esc(p.description)}</p><progress value="${progress(p.id)}" max="100" aria-label="Project progress"></progress><small>${projectStatus(p.id)} · ${progress(p.id)}%</small></article>`).join("")}</div>`;
+}
+function feed(rows) {
+  return rows.length
+    ? `<div class="feed card">${rows.map((e) => `<article><span class="avatar" aria-hidden="true">${esc(e.name.slice(0, 1))}</span><div><strong>${esc(e.name)}</strong> ${esc(e.message)}<small>${anchor("projects/" + e.project_id, byId(state.projects, e.project_id)?.name ?? "Project")} · ${when(e.created_at)}</small></div></article>`).join("")}</div>`
+    : none("No activity to show.");
+}
+function home() {
+  const { projects, tasks, activity } = state;
+  const deadlines = [
+    ...tasks
+      .filter((t) => t.stage !== "Done")
+      .map((t) => ({ ...t, link: t.project_id })),
+    ...projects
+      .filter((p) => projectStatus(p.id) !== "Completed")
+      .map((p) => ({ ...p, link: p.id })),
+  ]
+    .filter((t) => t.due_date >= day())
+    .sort((a, b) => a.due_date.localeCompare(b.due_date))
+    .slice(0, 6);
+  return (
+    stats([
+      ["Total projects", projects.length, "In this workspace"],
+      [
+        "In progress",
+        projects.filter((p) => projectStatus(p.id) === "In progress").length,
+        "Active projects",
+      ],
+      [
+        "Completed",
+        projects.filter((p) => projectStatus(p.id) === "Completed").length,
+        "Finished projects",
+      ],
+      ["Overdue tasks", tasks.filter(overdue).length, "Past their deadline"],
+    ]) +
+    panel(
+      "Needs your attention",
+      taskCards(
+        tasks
+          .filter(
+            (t) =>
+              overdue(t) ||
+              (t.due_date === day() && t.stage !== "Done") ||
+              t.stage === "In review",
+          )
+          .sort((a, b) => Number(overdue(b)) - Number(overdue(a))),
+      ),
+    ) +
+    panel(
+      "Recent projects",
+      projectCards(projects.slice(0, 3)) +
+        anchor("projects", "View all projects", "more"),
+    ) +
+    `<div class="split">${panel("Recent activity", feed(activity.slice(0, 4)))}${panel(
+      "Upcoming deadlines",
+      table(
+        ["Work", "Due"],
+        deadlines.map((t) => [
+          anchor("projects/" + t.link, t.name),
+          date(t.due_date),
+        ]),
+        "No upcoming deadlines.",
+      ),
+    )}</div>`
+  );
+}
+function projectsPage() {
+  const id = route()[1];
+  if (id) {
+    const p = byId(state.projects, id);
+    if (!p) return none("This project is unavailable.");
+    return (
+      `<div class="project-meta">${anchor("projects", "All projects")} · ${projectStatus(id)} · ${date(p.due_date)} ${managing() ? action("project", "Edit project", id, "secondary") : ""}</div>` +
+      taskView(projectTasks(id)) +
+      panel(
+        "Project activity",
+        action("update", "Post work update", id, "secondary") +
+          feed(state.activity.filter((e) => e.project_id === id)),
+      )
     );
-    const visible = view === "Home" && !query ? matches.slice(0, 3) : matches;
-    for (const project of visible) {
-      const card = template("project-card");
-      const title = card.querySelector(".project-title");
-      title.textContent = project.name;
-      title.onclick = () => openProject(project);
-      card.querySelector(".project-description").textContent = project.description;
-      const status = card.querySelector(".status");
-      status.textContent = project.status;
-      status.classList.add(projectTones[project.status]);
-      card.querySelector(".card-footer small").textContent = "Edited " + projectTime(project);
-      const star = card.querySelector(".star-button");
-      star.textContent = project.starred ? "★" : "☆";
-      star.setAttribute("aria-pressed", String(Boolean(project.starred)));
-      star.setAttribute("aria-label", (project.starred ? "Unstar " : "Star ") + project.name);
-      star.onclick = () => {
-        project.starred = !project.starred;
-        saveProjects();
-        updateProjects(project);
-      };
-      cards.append(card);
-      if (project === focusedProject) star.focus();
-    }
-    emptyProjects.hidden = visible.length > 0;
-    emptyProjects.textContent = !query && view === "Starred"
-      ? "No starred projects yet."
-      : "No projects match your search.";
-    if (focusedProject && !visible.includes(focusedProject)) projectsHeading.focus();
-    root.querySelector("#project-count").textContent = projects.length;
-    const summary = root.querySelector(".project-summary");
-    summary.replaceChildren();
-    for (const [label, count] of [
-      ["Total projects", projects.length],
-      ["In progress", projects.filter(project => project.status === "In progress").length],
-      ["Starred", projects.filter(project => project.starred).length],
-    ]) {
-      const item = document.createElement("div");
-      item.className = "card";
-      const caption = document.createElement("dt");
-      const number = document.createElement("dd");
-      caption.textContent = label;
-      number.textContent = count;
-      item.append(caption, number);
-      summary.append(item);
-    }
-    root.querySelector("#storage-notice").hidden = storageAvailable;
-    root.querySelector("#featured-description").textContent =
-      "Jump back into " + projects[0].name + " and keep the momentum going.";
-    root.querySelector("#current-view").textContent = view;
-    projectsHeading.textContent = view === "Home" ? "Recent projects" : view;
-    viewAll.hidden = view !== "Home";
-    for (const button of root.querySelectorAll(".nav-link[data-view]")) {
-      if (button.dataset.view === view) button.setAttribute("aria-current", "page");
-      else button.removeAttribute("aria-current");
-    }
-    const activity = root.querySelector(".activity-list");
-    activity.replaceChildren();
-    for (const project of projects.filter(project => project.activity)) {
-      const row = template("activity-row");
-      row.querySelector("strong").textContent = project.name;
-      row.querySelector("p").textContent = project.activity;
-      row.querySelector("small").textContent = projectTime(project);
-      activity.append(row);
-    }
   }
+  const rows = state.projects.filter(
+    (p) =>
+      (!filters.status || projectStatus(p.id) === filters.status) &&
+      (!filters.star || p.starred),
+  );
+  return (
+    `<div class="toolbar">${tabs(
+      "status",
+      ["", "Planning", "In progress", "Completed"].map((s) => [
+        s,
+        s || "All projects",
+      ]),
+    )}${filter("star", "Show", [["star", "Starred"]])}</div>` +
+    projectCards(rows.slice(0, 3)) +
+    panel(
+      "All projects",
+      table(
+        ["Project", "Status", "Progress", "Tasks done", "Due date"],
+        rows.map((p) => [
+          anchor("projects/" + p.id, p.name),
+          projectStatus(p.id),
+          progress(p.id) + "%",
+          tasksDone(projectTasks(p.id)) + " / " + projectTasks(p.id).length,
+          date(p.due_date),
+        ]),
+        "No matching projects.",
+      ),
+    )
+  );
+}
+function taskView(source) {
+  const rows = source.filter(
+    (t) =>
+      (!filters.stage || t.stage === filters.stage) &&
+      (!filters.priority || t.priority === filters.priority) &&
+      (!filters.project || t.project_id === filters.project) &&
+      (!filters.assignee || t.assignee === filters.assignee) &&
+      (!filters.due ||
+        (filters.due === "overdue"
+          ? overdue(t)
+          : t.due_date >= day() && t.due_date <= day(6) && t.stage !== "Done")),
+  );
+  rows.sort((a, b) =>
+    filters.sort === "priority"
+      ? priorities.indexOf(b.priority) - priorities.indexOf(a.priority)
+      : filters.sort === "name"
+        ? a.name.localeCompare(b.name)
+        : filters.sort === "due"
+          ? (a.due_date || "9999").localeCompare(b.due_date || "9999")
+          : 0,
+  );
+  function stageControl(t) {
+    if (!managing() && t.assignee !== state.user.id) return esc(t.stage);
+    return `<select data-stage="${t.id}" aria-label="Status for ${esc(t.name)}">${options(stages, t.stage)}</select>`;
+  }
+  const open = (t) => action("task", t.name, t.id, "text-button");
+  const person = (t) =>
+    esc(byId(state.members, t.assignee)?.name ?? "Unassigned");
+  const board = filters.view === "board";
+  return (
+    `<div class="toolbar">${tabs("view", [
+      ["", "List"],
+      ["board", "Board"],
+    ])}${filter("stage", "Status", stages)}${filter(
+      "priority",
+      "Priority",
+      priorities.map((p) => [p, priorityLabels[p]]),
+    )}${filter("due", "Deadline", [
+      ["overdue", "Overdue"],
+      ["week", "Next 7 days"],
+    ])}${
+      page() === "my-tasks"
+        ? filter("project", "Project", projectPairs())
+        : filter(
+            "assignee",
+            "Assignee",
+            eligible(route()[1]).map((m) => [m.id, m.name]),
+          )
+    }${filter("sort", "Sort", [
+      ["due", "Deadline"],
+      ["priority", "Priority"],
+      ["name", "Name"],
+    ])}${savedViewControls()}</div>` +
+    (board
+      ? `<div class="board">${stages
+          .map(
+            (s) =>
+              `<section data-drop-stage="${s}"><h2>${s} <small>${rows.filter((t) => t.stage === s).length}</small></h2>${
+                rows
+                  .filter((t) => t.stage === s)
+                  .map(
+                    (t) =>
+                      `<article class="card" draggable="${managing() || t.assignee === state.user.id}" data-drag-task="${t.id}">${open(t)}<p>${priorityLabels[t.priority]} · ${person(t)}</p><small>${date(t.due_date)}</small>${stageControl(t)}</article>`,
+                  )
+                  .join("") || none("No tasks")
+              }</section>`,
+          )
+          .join("")}</div>`
+      : `<div class="mobile-task-list">${taskCards(rows)}</div><div class="desktop-task-list">` +
+        table(
+          ["Task", "Project", "Priority", "Assignee", "Status", "Due date"],
+          rows.map((t) => [
+            open(t),
+            anchor(
+              "projects/" + t.project_id,
+              byId(state.projects, t.project_id).name,
+            ),
+            priorityLabels[t.priority],
+            person(t),
+            stageControl(t),
+            date(t.due_date),
+          ]),
+          "No tasks match this view.",
+        ) +
+        "</div>")
+  );
+}
+function myTasks() {
+  const rows = state.tasks.filter((t) => t.assignee === state.user.id);
+  return (
+    stats([
+      ["Assigned to me", rows.length, "Across your projects"],
+      [
+        "Due soon",
+        rows.filter(
+          (t) =>
+            t.due_date >= day() && t.due_date <= day(6) && t.stage !== "Done",
+        ).length,
+        "Next seven days",
+      ],
+      ["Completed", tasksDone(rows), "Finished tasks"],
+      ["Overdue", rows.filter(overdue).length, "Require attention"],
+    ]) + taskView(rows)
+  );
+}
 
-  function selectView(nextView) {
-    view = nextView;
-    search.value = "";
-    setMenu(false);
-    updateProjects();
+function teams() {
+  const { members, invitations, tasks } = state;
+  const manage = state.user.role === "Owner";
+  return (
+    stats([
+      ["Team members", members.length, "Workspace members"],
+      [
+        "Managers",
+        members.filter((m) => m.role === "Manager").length,
+        "Coordinating delivery",
+      ],
+      [
+        "Open assignments",
+        tasks.filter((t) => t.assignee && t.stage !== "Done").length,
+        "Across visible projects",
+      ],
+      manage
+        ? ["Pending invitations", invitations.length, "Waiting to join"]
+        : ["Projects", state.projects.length, "In your view"],
+    ]) +
+    `<div class="toolbar">${filter("role", "Role", ["Owner", "Manager", "Member"])}${action("accept", "Join with an invitation", "", "secondary")}</div><div class="cards">${members
+      .filter((m) => !filters.role || m.role === filters.role)
+      .map(
+        (m) =>
+          `<article class="card"><div class="member"><span class="avatar">${esc(m.name.slice(0, 1))}</span><div><h3>${esc(m.name)}</h3><small>${esc(m.job_title || m.role)}</small></div></div><hr><small>${esc(m.role)} · ${tasks.filter((t) => t.assignee === m.id && t.stage !== "Done").length} active tasks</small><p>${manage && m.role !== "Owner" ? action("member", "Manage member", m.id, "text-button") : esc(m.email)}</p></article>`,
+      )
+      .join("")}</div>` +
+    (manage
+      ? panel(
+          "Pending invitations",
+          table(
+            ["Email", "Role", "Expires", "Action"],
+            invitations.map((i) => [
+              esc(i.email),
+              i.role,
+              date(i.expires_at),
+              action("revoke", "Revoke", i.email, "text-button"),
+            ]),
+            "No pending invitations.",
+          ),
+        )
+      : "")
+  );
+}
+function activityPage() {
+  const cutoff = Date.now() - Number(filters.period || 0) * 86400000;
+  const rows = state.activity.filter(
+    (e) =>
+      (!filters.mine || e.actor === state.user.id) &&
+      (!filters.project || e.project_id === filters.project) &&
+      (!filters.kind || e.kind === filters.kind) &&
+      (!filters.period || new Date(e.created_at) >= cutoff),
+  );
+  const week = state.activity.filter(
+    (e) => Date.now() - new Date(e.created_at) < 7 * 86400000,
+  );
+  return `<div class="toolbar">${tabs("mine", [
+    ["", "All activity"],
+    ["me", "My activity"],
+  ])}${filter("project", "Project", projectPairs())}${filter("kind", "Type", ["Created", "Assignment", "Task update", "Comment", "Work update", "Project"])}${filter(
+    "period",
+    "Period",
+    [
+      ["7", "Last 7 days"],
+      ["30", "Last 30 days"],
+    ],
+  )}</div><div class="split">${feed(rows)}<aside class="card glance"><h2>This week at a glance</h2><strong>${week.length}</strong><p>Recorded team actions</p><hr><p>${week.filter((e) => e.kind === "Comment").length} comments</p><p>${week.filter((e) => e.kind === "Task update").length} task updates</p></aside></div>`;
+}
+function notificationsPage() {
+  const rows = state.notifications.filter(
+    (n) =>
+      (!filters.unread || !n.seen) &&
+      (!filters.kind || n.kind === filters.kind),
+  );
+  return (
+    `<div class="toolbar">${tabs("unread", [
+      ["", "All"],
+      ["yes", "Unread"],
+    ])}${filter("kind", "Type", ["Assignment", "Mention", "Completion"])}</div>` +
+    (rows.length
+      ? `<div class="feed card">${rows.map((n) => `<article><span class="avatar">${n.seen ? "✓" : "!"}</span><div><strong>${esc(n.kind)}</strong><p>${esc(n.name)} ${esc(n.message)}</p><small>${when(n.created_at)} · ${anchor("projects/" + n.project_id, "Open project")}</small></div>${n.seen ? "" : action("read", "Mark read", n.id, "secondary")}</article>`).join("")}</div>`
+      : none("No notifications to show."))
+  );
+}
+function input(key, label, value = "", type = "text", required = true) {
+  return `<label>${esc(label)}<input name="${key}" type="${type}" value="${esc(value)}" ${required ? "required" : ""} ${type === "password" ? 'minlength="8" maxlength="256"' : ""}></label>`;
+}
+function select(key, label, pairs, value) {
+  return `<label>${esc(label)}<select name="${key}">${options(pairs, value)}</select></label>`;
+}
+const check = (key, label, on, val = "on", disabled = false) =>
+  `<label class="check"><input type="checkbox" name="${key}" value="${esc(val)}" ${on ? "checked" : ""} ${disabled ? "disabled" : ""}>${esc(label)}</label>`;
+const form = (type, children, submit, id = "") =>
+  `<form data-form="${type}" data-id="${esc(id)}">${children}<button>${esc(submit)}</button></form>`;
+function browserProjects() {
+  try {
+    const rows = JSON.parse(localStorage.getItem("overviewProjects"));
+    return Array.isArray(rows)
+      ? rows.filter(
+          (p) =>
+            typeof p?.name === "string" &&
+            /^\d{4}-\d\d-\d\dT/.test(p.time) &&
+            Number.isFinite(Date.parse(p.time)),
+        )
+      : [];
+  } catch {
+    return [];
   }
-
-  for (const button of root.querySelectorAll("[data-view]")) {
-    button.onclick = () => {
-      selectView(button.dataset.view);
-      if (button === viewAll || menuToggle.getClientRects().length) projectsHeading.focus();
-    };
+}
+function settings() {
+  const u = state.user;
+  const tab = filters.tab ?? "";
+  let html;
+  if (tab === "workspace")
+    html =
+      form(
+        "switch",
+        select(
+          "workspace",
+          "Active workspace",
+          state.spaces.map((s) => [s.id, s.name]),
+          u.workspace,
+        ),
+        "Switch workspace",
+      ) +
+      (u.role === "Owner"
+        ? form(
+            "workspace",
+            input("name", "Workspace name", u.workspace_name),
+            "Save workspace",
+          )
+        : "");
+  else if (tab === "preferences")
+    html = form(
+      "preferences",
+      check("in_app", "In-app alerts", u.in_app) +
+        check(
+          "email_alerts",
+          "Email alerts",
+          u.email_alerts,
+          "on",
+          !state.mailEnabled,
+        ) +
+        (state.mailEnabled
+          ? ""
+          : "<small>Email delivery is unavailable in this installation.</small>"),
+      "Save preferences",
+    );
+  else if (tab === "security")
+    html = form(
+      "password",
+      input("current", "Current password", "", "password") +
+        input("password", "New password", "", "password"),
+      "Change password",
+    );
+  else
+    html =
+      `<div class="member"><span class="avatar">${esc(u.name.slice(0, 1))}</span><strong>${esc(u.email)}</strong></div>` +
+      form(
+        "profile",
+        input("name", "Full name", u.name) +
+          input("job_title", "Job title", u.job_title, "text", false),
+        "Save profile",
+      );
+  const panes = [
+    ["", "Personal profile"],
+    ["workspace", "Workspace settings"],
+    ["preferences", "Notification preferences"],
+    ["security", "Account security"],
+  ];
+  if (tab === "security" && state.legacyProjects)
+    html += `<p>Earlier projects are associated with your email. Verify ownership through password recovery to move them into your personal workspace.</p>${anchor("forgot-password", "Recover earlier projects")}`;
+  if (tab === "workspace" && u.role === "Owner" && browserProjects().length)
+    html += form(
+      "import",
+      `<fieldset><legend>Projects saved in this browser</legend>${browserProjects()
+        .map((p, i) => check("legacy", p.name, false, i))
+        .join("")}</fieldset>`,
+      "Import selected projects",
+    );
+  return `<div class="settings-grid">${tabs("tab", panes)}<section class="card"><h2>${panes.find(([v]) => v === tab)[1]}</h2>${html}</section></div>`;
+}
+const screens = {
+  home,
+  projects: projectsPage,
+  "my-tasks": myTasks,
+  teams,
+  activity: activityPage,
+  notifications: notificationsPage,
+  settings,
+};
+function paint() {
+  root.removeAttribute("aria-busy");
+  const current = page(),
+    u = state.user,
+    project = current === "projects" && byId(state.projects, route()[1]);
+  const unread = state.notifications.filter((n) => !n.seen).length;
+  root.querySelector(".top-links a").textContent = unread
+    ? "Notifications (" + unread + ")"
+    : "Notifications";
+  document.querySelector("#space-name").textContent = u.workspace_name;
+  document.querySelector("#space-role").textContent = u.role + " · Workspace";
+  document.querySelector("#current-view").textContent = labels[current];
+  document.querySelector("nav").innerHTML = Object.entries(labels)
+    .map(
+      ([id, label]) =>
+        `<a class="nav-link" href="#/${id}" ${current === id ? 'aria-current="page"' : ""}>${label}${id === "notifications" && unread ? ` <b>${unread}</b>` : ""}</a>`,
+    )
+    .join("");
+  let primary = "";
+  if (managing() && (current === "home" || current === "projects"))
+    primary = project
+      ? action("task", "＋ New task")
+      : action("project", "＋ New project");
+  if (current === "teams" && u.role === "Owner")
+    primary = action("invite", "＋ Invite member");
+  if (current === "notifications" && unread)
+    primary = action("read", "Mark all as read");
+  const title = project
+    ? project.name
+    : current === "home"
+      ? "Your work today"
+      : current === "activity"
+        ? "Team Activity"
+        : labels[current];
+  document.title = title + " | Overview";
+  document.querySelector("#content").innerHTML =
+    `<div class="section-heading"><div><h1>${esc(title)}</h1><p class="subtitle">${esc(project ? project.description : descriptions[current])}</p></div>${primary}</div>` +
+    screens[current]();
+}
+function dialog(title, html) {
+  const modal = document.querySelector("dialog");
+  document.querySelector("#dialog-title").textContent = title;
+  document.querySelector("#dialog-content").innerHTML = html;
+  if (!modal.open) modal.showModal();
+}
+let lastSynced = 0;
+async function refresh(preserveDrafts = false) {
+  const seq = ++version;
+  let next;
+  try {
+    if (!state) showLoadingSkeleton();
+    root.setAttribute("aria-busy", "true");
+    next = await request("workspace/state");
+  } catch (error) {
+    if (seq !== version) return;
+    root.removeAttribute("aria-busy");
+    throw error;
   }
-  search.oninput = () => updateProjects();
-  root.querySelector("#close-dialog").onclick = () => dialog.close();
-  root.querySelector("#open-project").onclick = () => openProject(projects[0]);
-  root.querySelector("#new-project").onclick = () => {
-    openDialog("New project");
-    const form = document.createElement("form");
-    form.noValidate = true;
-    const button = document.createElement("button");
-    button.textContent = "Create project";
-    form.append(field("projectName"), button);
-    content.append(form);
-    form.onsubmit = event => {
-      event.preventDefault();
-      const values = validateForm(form);
-      if (!values) return;
-      const name = values.projectName.trim();
-      projects.unshift({ name, description: "", status: "Planning", time: new Date().toISOString(), activity: "You created a new project." });
-      saveProjects();
-      dialog.close();
-      selectView("All projects");
-    };
-    form.querySelector("input").focus();
-  };
-  root.querySelector("#logout").onclick = () => {
-    session(false);
+  if (seq !== version) return;
+  state = next;
+  lastSynced = Date.now();
+  root.removeAttribute("aria-busy");
+  if (root.className !== "dashboard") {
+    root.className = "dashboard";
+    root.replaceChildren(template("dashboard"));
+    root.querySelector(".wordmark").textContent = "Overview";
+  }
+  if (
+    !preserveDrafts ||
+    !root.querySelector('#content form[data-dirty="true"]')
+  )
+    paint();
+}
+function auth(pageName) {
+  root.className = "auth";
+  root.replaceChildren(template("auth"));
+  root.querySelector(".wordmark").textContent = "Overview";
+  document.title = pages[pageName].title + " | Overview";
+  renderAuthContent(pageName);
+}
+function showLoadingSkeleton() {
+  root.setAttribute("aria-busy", "true");
+  const pageSkeleton = `
+    <div class="section-heading">
+      <div>
+        <div class="skeleton skeleton-heading"></div>
+        <div class="skeleton skeleton-subtitle"></div>
+      </div>
+    </div>
+    <div class="skeleton-stats">
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+    </div>
+    <div class="skeleton skeleton-banner"></div>
+    <div class="skeleton-grid">
+      <div class="skeleton skeleton-card large"></div>
+      <div class="skeleton skeleton-card large"></div>
+      <div class="skeleton skeleton-card large"></div>
+    </div>
+  `;
+  if (state && root.className === "dashboard") {
+    root.querySelector("#content").innerHTML = pageSkeleton;
+    return;
+  }
+  root.className = "skeleton-app";
+  root.innerHTML = `
+    <div class="skeleton-screen" role="status" aria-label="Loading workspace">
+      <div class="skeleton-sidebar">
+        <div class="skeleton skeleton-logo"></div>
+        <div class="skeleton skeleton-block"></div>
+        <div class="skeleton skeleton-row"></div>
+        <div class="skeleton skeleton-row short"></div>
+        <div class="skeleton skeleton-row"></div>
+      </div>
+      <div class="skeleton-page">
+        <div class="skeleton skeleton-heading"></div>
+        <div class="skeleton-stats">
+          <div class="skeleton skeleton-card"></div>
+          <div class="skeleton skeleton-card"></div>
+          <div class="skeleton skeleton-card"></div>
+          <div class="skeleton skeleton-card"></div>
+        </div>
+        <div class="skeleton skeleton-banner"></div>
+        <div class="skeleton-grid">
+          <div class="skeleton skeleton-card large"></div>
+          <div class="skeleton skeleton-card large"></div>
+          <div class="skeleton skeleton-card large"></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+async function render() {
+  const requested = route()[0];
+  if (lastRoute !== location.hash) {
+    filters = {};
+    lastRoute = location.hash;
+  }
+  root.querySelector("dialog[open]")?.close();
+  const menu = root.querySelector(".menu-toggle");
+  menu?.setAttribute("aria-expanded", "false");
+  root.querySelector(".sidebar-menu")?.classList.remove("is-open");
+  if (Object.hasOwn(pages, requested)) {
+    version++;
+    auth(requested);
+    return;
+  }
+  if (state && root.className === "dashboard") {
+    paint();
+    if (Date.now() - lastSynced > 30000) refresh(true).catch(handleError);
+    return;
+  }
+  try {
+    await refresh();
+  } catch (error) {
+    if (error.status === 401) {
+      state = null;
+      location.hash = "/login";
+    } else {
+      root.replaceChildren();
+      root.className = "";
+      root.innerHTML = action("retry", "Retry loading workspace");
+      showError(root, error);
+    }
+  }
+}
+function editor(type, id) {
+  if (type === "project") {
+    const p = byId(state.projects, id) ?? {};
+    dialog(
+      id ? "Edit project" : "New project",
+      form(
+        type,
+        input("name", "Project name", p.name) +
+          input("description", "Description", p.description, "text", false) +
+          input("due_date", "Deadline", p.due_date, "date", false),
+        id ? "Save changes" : "Create project",
+        id,
+      ) +
+        (id ? action("delete-project", "Delete project", id, "secondary") : ""),
+    );
+  } else if (type === "task") {
+    const t = byId(state.tasks, id) ?? {},
+      project = t.project_id ?? route()[1];
+    const people = eligible(project).map((m) => [m.id, m.name]);
+    let fields = managing()
+      ? input("name", "Task name", t.name) +
+        select(
+          "priority",
+          "Priority",
+          priorities.map((p) => [p, priorityLabels[p]]),
+          t.priority ?? "Should Have",
+        ) +
+        select(
+          "assignee",
+          "Assignee",
+          [["", "Unassigned"], ...people],
+          t.assignee,
+        ) +
+        input("due_date", "Deadline", t.due_date, "date", false)
+      : "";
+    fields += select("stage", "Status", stages, t.stage) + taskDetailFields(t);
+    const edit = managing() || t.assignee === state.user.id;
+    const info = edit
+      ? form("task", fields, id ? "Save task" : "Create task", id)
+      : `<p>${esc(t.description)}</p><ul>${(t.checklist ?? []).map((item) => `<li>${item.done ? "?" : "?"} ${esc(item.text)}</li>`).join("")}</ul>` +
+        none(
+          t.stage +
+            " · " +
+            priorityLabels[t.priority] +
+            " · " +
+            date(t.due_date),
+        );
+    const comments = id
+      ? panel(
+          "Comments",
+          feed(
+            state.activity.filter(
+              (e) => e.node_id === id && e.kind === "Comment",
+            ),
+          ) +
+            form(
+              "comment",
+              input("message", "Comment") +
+                select("mention", "Mention a member", [
+                  ["", "No mention"],
+                  ...people,
+                ]),
+              "Post comment",
+              id,
+            ),
+        )
+      : "";
+    dialog(
+      t.name ?? "New task",
+      info +
+        attachmentPanel(t, edit) +
+        comments +
+        (id && managing()
+          ? action("delete-task", "Delete task", id, "secondary")
+          : ""),
+    );
+  } else if (type === "invite")
+    dialog(
+      "Invite member",
+      form(
+        type,
+        input("email", "Email address", "", "email") +
+          select("role", "Workspace role", ["Member", "Manager"]),
+        "Create invitation",
+      ),
+    );
+  else if (type === "accept")
+    dialog(
+      "Join a workspace",
+      form(type, input("code", "Invitation code"), "Join workspace"),
+    );
+  else if (type === "member") {
+    const m = byId(state.members, id);
+    dialog(
+      m.name,
+      form(
+        type,
+        select("role", "Role", ["Member", "Manager"], m.role) +
+          `<fieldset><legend>Project assignments</legend>${state.projects.map((p) => check("projects", p.name, m.projects.includes(p.id), p.id)).join("") || "No projects yet."}</fieldset>`,
+        "Save member",
+        id,
+      ) + action("remove", "Remove from workspace", id, "secondary"),
+    );
+  } else if (type === "update")
+    dialog(
+      "Post work update",
+      form(type, input("message", "Work update"), "Post update", id),
+    );
+}
+async function mutate(path, values) {
+  const destination = location.hash;
+  const result = await request(path, values);
+  if (root.className !== "dashboard") return result;
+  await refresh(location.hash !== destination);
+  return result;
+}
+root.addEventListener("click", async (event) => {
+  if (event.target.closest("dialog a[href]"))
+    root.querySelector("dialog").close();
+  if (event.target.closest("#close-dialog")) {
+    root.querySelector("dialog").close();
+    return;
+  }
+  const menu = event.target.closest(".menu-toggle");
+  if (menu) {
+    const open = root
+      .querySelector(".sidebar-menu")
+      .classList.toggle("is-open");
+    menu.setAttribute("aria-expanded", open);
+    menu.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+    return;
+  }
+  const tab = event.target.closest("[data-filter-key]");
+  if (tab) {
+    filters[tab.dataset.filterKey] = tab.dataset.value;
+    paint();
+    root
+      .querySelector(
+        `[data-filter-key="${tab.dataset.filterKey}"][aria-pressed="true"]`,
+      )
+      ?.focus();
+    return;
+  }
+  const btn = event.target.closest("[data-action]");
+  if (!btn) return;
+  const { action: type, id } = btn.dataset;
+  btn.disabled = true;
+  try {
+    if (type === "retry") await render();
+    else if (type === "logout") {
+      await request("auth/logout", {});
+      state = null;
+      location.hash = "/login";
+    } else if (type === "star")
+      await mutate("workspace/star", {
+        project_id: id,
+        starred: !byId(state.projects, id).starred,
+      });
+    else if (type === "read")
+      await mutate("workspace/read", { id: id || null });
+    else if (type === "revoke") {
+      if (confirm("Revoke this invitation?"))
+        await mutate("workspace/revoke", { email: id });
+    } else if (type === "delete-project" || type === "delete-task") {
+      const project = type === "delete-project";
+      const item = byId(project ? state.projects : state.tasks, id);
+      if (
+        confirm(
+          "Permanently delete " +
+            item.name +
+            (project ? " and its tasks, comments and activity" : "") +
+            "?",
+        )
+      ) {
+        await mutate("workspace/" + type, {
+          id,
+          project_id: project ? id : item.project_id,
+        });
+        root.querySelector("dialog").close();
+        if (project) location.hash = "/projects";
+      }
+    } else if (type === "remove") {
+      if (confirm("Remove this member and clear their assignments?")) {
+        await mutate("workspace/member", { id, remove: true });
+        root.querySelector("dialog").close();
+      }
+    } else editor(type, id);
+  } catch (error) {
+    handleError(error);
+  } finally {
+    btn.disabled = false;
+  }
+});
+function handleError(error) {
+  if (error.status === 401) {
+    state = null;
     location.hash = "/login";
-  };
-  updateProjects();
-}
-
-function render() {
-  const requested = location.hash.slice(2);
-  const loggedIn = session();
-  const page = loggedIn ? "dashboard" : Object.hasOwn(pages, requested) ? requested : "login";
-  if (location.hash !== "#/" + page) {
-    history.replaceState(null, "", "#/" + page);
+    return;
   }
-  if (loggedIn) {
-    renderScreen("dashboard", renderDashboardSkeleton, renderDashboardContent, 850);
-  } else {
-    renderScreen("auth", () => renderAuthSkeleton(pages[page].fields), () => renderAuthContent(page), 650);
-  }
-  document.title = (loggedIn ? "Dashboard" : pages[page].title) + " | " + appName;
+  showError(
+    root.querySelector("dialog[open] #dialog-content") ??
+      root.querySelector("#content") ??
+      root,
+    error,
+  );
 }
-
+root.addEventListener("change", async (event) => {
+  const el = event.target;
+  if (el.dataset.filter) {
+    filters[el.dataset.filter] = el.value;
+    paint();
+    root.querySelector(`[data-filter="${el.dataset.filter}"]`)?.focus();
+  }
+  if (el.dataset.stage) {
+    const t = byId(state.tasks, el.dataset.stage);
+    el.disabled = true;
+    try {
+      await moveTask(t, el.value);
+      root.querySelector(`[data-stage="${t.id}"]`)?.focus();
+    } catch (error) {
+      el.value = t.stage;
+      handleError(error);
+    } finally {
+      el.disabled = false;
+    }
+  }
+});
+root.addEventListener("submit", async (event) => {
+  const f = event.target;
+  if (f.id === "search-form") {
+    event.preventDefault();
+    const query = f.elements.q.value.trim().toLowerCase();
+    const projects = state.projects.filter((p) =>
+      (p.name + " " + p.description).toLowerCase().includes(query),
+    );
+    const tasks = state.tasks.filter((t) =>
+      t.name.toLowerCase().includes(query),
+    );
+    dialog(
+      "Search results",
+      panel("Projects", projectCards(projects)) +
+        panel(
+          "Tasks",
+          table(
+            ["Task", "Project"],
+            tasks.map((t) => [
+              action("task", t.name, t.id, "text-button"),
+              anchor(
+                "projects/" + t.project_id,
+                byId(state.projects, t.project_id).name,
+              ),
+            ]),
+            "No matching tasks.",
+          ),
+        ),
+    );
+    return;
+  }
+  if (!f.dataset.form) return;
+  event.preventDefault();
+  const btn =
+    event.submitter ??
+    f.querySelector("button:not([type]),button[type=submit]");
+  if (!btn) return;
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const caption = btn.textContent;
+  btn.textContent = "Saving...";
+  const type = f.dataset.form,
+    id = f.dataset.id,
+    fd = new FormData(f),
+    d = Object.fromEntries(fd);
+  let path = "workspace/" + type;
+  if (id) d.id = id;
+  if (type === "save-view") d.filters = { ...filters };
+  if (type === "project" && !id) {
+    path = "projects";
+    d.areas = ["Progress"];
+    d.groups = ["Tasks"];
+  }
+  if ((type === "project" && id) || type === "update") d.project_id = id;
+  if (type === "task" || type === "comment")
+    d.project_id = byId(state.tasks, id)?.project_id ?? route()[1];
+  if (type === "task") {
+    d.checklist = Array.from(f.querySelectorAll("[data-check-row]"))
+      .map((row) => ({
+        text: row.querySelector("input[type=text]").value.trim(),
+        done: row.querySelector("input[type=checkbox]").checked,
+      }))
+      .filter((item) => item.text);
+  }
+  if (type === "member") d.projects = fd.getAll("projects");
+  if (type === "import")
+    d.projects = fd.getAll("legacy").map((i) => browserProjects()[Number(i)]);
+  if (type === "preferences") {
+    d.in_app = fd.has("in_app");
+    d.email_alerts = fd.has("email_alerts");
+  }
+  if (type === "password") path = "auth/password";
+  const destination = location.hash;
+  try {
+    const result = await mutate(path, d);
+    if (location.hash !== destination || root.className !== "dashboard") return;
+    if (type === "invite")
+      dialog(
+        "Invitation ready",
+        `<p>Share this code privately with ${esc(d.email)}. They can enter it under Teams after signing in.</p><label>Invitation code<input readonly value="${esc(result.code)}"></label>`,
+      );
+    else if (type === "comment") refreshTaskDialog(id);
+    else {
+      root.querySelector("dialog[open]")?.close();
+      if (type === "project" && !id) location.hash = "/projects/" + result.id;
+      else {
+        const p = document.createElement("p");
+        p.className = "notice";
+        p.setAttribute("role", "status");
+        p.textContent = "Changes saved.";
+        root.querySelector("#content").prepend(p);
+      }
+    }
+  } catch (error) {
+    handleError(error);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = caption;
+  }
+});
 window.addEventListener("hashchange", render);
 window.addEventListener("pageshow", render);
-window.addEventListener("storage", event => {
-  if (event.key === "loggedIn" || event.key === null) render();
+root.addEventListener("input", (event) => {
+  const form = event.target.closest("#content form");
+  if (form) form.dataset.dirty = "true";
+});
+let checkingAlerts = false;
+async function checkAlerts() {
+  if (
+    checkingAlerts ||
+    document.hidden ||
+    !state ||
+    root.className !== "dashboard"
+  )
+    return;
+  checkingAlerts = true;
+  const active = state;
+  try {
+    const { count, latest } = await request("workspace/unread");
+    if (state !== active || root.className !== "dashboard") return;
+    const unread = state.notifications.filter((n) => !n.seen);
+    const label = root.querySelector(".top-links a");
+    label.textContent = count
+      ? "Notifications (" + count + ")"
+      : "Notifications";
+    if (
+      page() === "notifications" &&
+      (count !== unread.length || latest !== (unread[0]?.id ?? null))
+    )
+      await refresh();
+  } catch (error) {
+    if (error.status === 401) handleError(error);
+  } finally {
+    checkingAlerts = false;
+  }
+}
+window.setInterval(checkAlerts, 45000);
+window.addEventListener("focus", checkAlerts);
+function taskCards(rows) {
+  return rows.length
+    ? '<div class="task-cards">' +
+        rows
+          .map(
+            (t) =>
+              '<article class="card">' +
+              action("task", t.name, t.id, "text-button") +
+              "<p>" +
+              esc(byId(state.projects, t.project_id)?.name) +
+              "</p><p>" +
+              esc(byId(state.members, t.assignee)?.name ?? "Unassigned") +
+              " · " +
+              priorityLabels[t.priority] +
+              '</p><p class="' +
+              (overdue(t) ? "overdue" : "") +
+              '">' +
+              (overdue(t) ? "Overdue · " : "") +
+              date(t.due_date) +
+              "</p>" +
+              (managing() || t.assignee === state.user.id
+                ? '<label>Status<select data-stage="' +
+                  t.id +
+                  '">' +
+                  options(stages, t.stage) +
+                  "</select></label>"
+                : esc(t.stage)) +
+              "</article>",
+          )
+          .join("") +
+        "</div>"
+    : none("You’re all caught up.");
+}
+function savedViewControls() {
+  return (
+    "<label>Saved view<select data-saved-view>" +
+    options(
+      [
+        ["", "Choose a view"],
+        ...(state.savedViews ?? []).map((v) => [v.name, v.name]),
+      ],
+      filters.saved ?? "",
+    ) +
+    "</select></label>" +
+    action("save-view", "Save view", "", "secondary") +
+    (filters.saved
+      ? action("delete-view", "Delete saved view", filters.saved, "secondary")
+      : "")
+  );
+}
+function checklistRow(item = { text: "", done: false }) {
+  return (
+    '<div data-check-row class="check-row"><input type="checkbox" aria-label="Checklist item complete" ' +
+    (item.done ? "checked" : "") +
+    '><input type="text" aria-label="Checklist item" maxlength="500" value="' +
+    esc(item.text) +
+    '">' +
+    action("remove-check", "Remove", "", "text-button") +
+    "</div>"
+  );
+}
+function taskDetailFields(t) {
+  return (
+    '<label>Description<textarea name="description" maxlength="20000" rows="4">' +
+    esc(t.description) +
+    "</textarea></label><fieldset><legend>Checklist</legend><div data-checklist>" +
+    (t.checklist ?? []).map(checklistRow).join("") +
+    "</div>" +
+    action("add-check", "Add checklist item", "", "secondary") +
+    "</fieldset>"
+  );
+}
+function refreshTaskDialog(id) {
+  const modal = root.querySelector("dialog[open]");
+  if (!modal) return;
+  const draft = modal.querySelector('form[data-form="task"]');
+  const comment = modal.querySelector('form[data-form="comment"]');
+  if ((draft ?? comment)?.dataset.id !== id) return;
+  editor("task", id);
+  if (draft) modal.querySelector('form[data-form="task"]')?.replaceWith(draft);
+}
+function attachmentPanel(t, edit) {
+  if (!t.id) return "";
+  return panel(
+    "Attachments",
+    (state.attachments ?? [])
+      .filter((a) => a.node_id === t.id)
+      .map(
+        (a) =>
+          '<div class="attachment">' +
+          action("download", a.name, a.id, "text-button") +
+          (edit
+            ? action("delete-attachment", "Remove", a.id, "text-button")
+            : "") +
+          "</div>",
+      )
+      .join("") +
+      (edit
+        ? '<label>Attach a file (up to 1 MB)<input type="file" data-upload="' +
+          t.id +
+          '"></label>'
+        : ""),
+  );
+}
+let undoMove;
+async function moveTask(task, stage) {
+  if (task.stage === stage) return;
+  await mutate("workspace/task", {
+    id: task.id,
+    project_id: task.project_id,
+    stage,
+    expected_stage: task.stage,
+  });
+  undoMove = {
+    id: task.id,
+    project_id: task.project_id,
+    stage: task.stage,
+    expected_stage: stage,
+  };
+  const notice = document.createElement("div");
+  notice.className = "notice";
+  notice.setAttribute("role", "status");
+  notice.innerHTML =
+    esc(task.name + " moved to " + stage) +
+    " " +
+    action("undo-move", "Undo", "", "text-button");
+  root.querySelector("#content")?.prepend(notice);
+}
+root.addEventListener("dragstart", (event) => {
+  const card = event.target.closest('[data-drag-task][draggable="true"]');
+  if (card) {
+    event.dataTransfer.setData("text/plain", card.dataset.dragTask);
+    event.dataTransfer.effectAllowed = "move";
+  }
+});
+root.addEventListener("dragover", (event) => {
+  if (event.target.closest("[data-drop-stage]")) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }
+});
+root.addEventListener("drop", async (event) => {
+  const column = event.target.closest("[data-drop-stage]");
+  if (!column) return;
+  event.preventDefault();
+  const task = byId(state.tasks, event.dataTransfer.getData("text/plain"));
+  if (!task) return;
+  try {
+    await moveTask(task, column.dataset.dropStage);
+  } catch (error) {
+    handleError(error);
+  }
+});
+root.addEventListener("click", async (event) => {
+  const btn = event.target.closest("[data-action]");
+  if (!btn) return;
+  const { action: type, id } = btn.dataset;
+  try {
+    if (type === "add-check") {
+      const list = btn.closest("fieldset").querySelector("[data-checklist]");
+      if (list.children.length >= 100)
+        throw Error("Use up to 100 checklist items");
+      list.insertAdjacentHTML("beforeend", checklistRow());
+      list.lastElementChild.querySelector("input[type=text]").focus();
+    }
+    if (type === "remove-check") btn.closest("[data-check-row]").remove();
+    if (type === "save-view")
+      dialog(
+        "Save current view",
+        form("save-view", input("name", "View name"), "Save view"),
+      );
+    if (type === "delete-view" && confirm("Delete this saved view?")) {
+      await mutate("workspace/delete-view", { name: id });
+      delete filters.saved;
+      paint();
+    }
+    if (type === "undo-move" && undoMove) {
+      await mutate("workspace/task", undoMove);
+      undoMove = null;
+    }
+    if (type === "download" || type === "delete-attachment") {
+      const file = byId(state.attachments, id),
+        task = byId(state.tasks, file.node_id);
+      const values = {
+        id: task.id,
+        project_id: task.project_id,
+        attachment_id: id,
+      };
+      if (type === "download") {
+        const result = await request("workspace/download", values);
+        const bytes = Uint8Array.from(
+          atob(result.content.replace(/\s/g, "")),
+          (c) => c.charCodeAt(0),
+        );
+        const url = URL.createObjectURL(
+          new Blob([bytes], { type: "application/octet-stream" }),
+        );
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = result.name;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      } else if (confirm("Remove this attachment?")) {
+        await mutate("workspace/delete-attachment", values);
+        refreshTaskDialog(task.id);
+      }
+    }
+  } catch (error) {
+    handleError(error);
+  }
+});
+root.addEventListener("change", async (event) => {
+  const el = event.target;
+  if (el.matches("[data-saved-view]")) {
+    const view = state.savedViews.find((v) => v.name === el.value);
+    filters = view ? { ...view.filters, saved: view.name } : {};
+    paint();
+  }
+  if (el.dataset.upload) {
+    const file = el.files[0];
+    if (!file) return;
+    try {
+      if (file.size === 0 || file.size > 1048576)
+        throw Error("Choose a file between 1 byte and 1 MB");
+      el.disabled = true;
+      const content = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(",")[1]);
+        reader.onerror = () => reject(Error("Unable to read this file"));
+        reader.readAsDataURL(file);
+      });
+      const task = byId(state.tasks, el.dataset.upload);
+      await mutate("workspace/attachment", {
+        id: task.id,
+        project_id: task.project_id,
+        name: file.name,
+        content,
+      });
+      refreshTaskDialog(task.id);
+    } catch (error) {
+      handleError(error);
+    } finally {
+      el.disabled = false;
+    }
+  }
 });
