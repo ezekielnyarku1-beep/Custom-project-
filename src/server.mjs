@@ -81,6 +81,8 @@ export async function handleRequest(request, response) {
       return;
     }
     health = request.method === "GET" && path === "/health";
+    if (request.method === "GET" && path === "/api/auth/config")
+      return send(200, { googleClientId: process.env.GOOGLE_CLIENT_ID || null });
     if (!connectionString) fail(503, "The server is missing DATABASE_URL");
     if (health) {
       const { rows } = await database.query("SELECT 1 AS result");

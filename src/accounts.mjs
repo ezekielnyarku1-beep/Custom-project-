@@ -160,7 +160,7 @@ export async function accountApi(db, request, path) {
     const googleSub = String(payload.sub);
     let user = (
       await db.query(
-        "SELECT id FROM accounts WHERE google_sub=$1 OR email=$2 ORDER BY (google_sub=$1) DESC LIMIT 1",
+        "SELECT id,google_sub FROM accounts WHERE google_sub=$1 OR email=$2 ORDER BY (google_sub=$1) DESC NULLS LAST LIMIT 1",
         [googleSub, address],
       )
     ).rows[0];
@@ -181,6 +181,9 @@ export async function accountApi(db, request, path) {
         user.id,
       ]);
     } else {
+      if (user.google_sub !== googleSub &&
+          (user.google_sub || (!address.endsWith("@gmail.com") && !payload.hd)))
+        fail(409, "Sign in with your existing account credentials");
       await db.query(
         "UPDATE accounts SET google_sub=$1 WHERE id=$2 AND google_sub IS NULL",
         [googleSub, user.id],

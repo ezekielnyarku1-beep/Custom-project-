@@ -25,6 +25,11 @@ try {
         ),
       );
   }
+  const { rows: [google] } = await client.query(
+    "SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='accounts' AND column_name='google_sub'",
+  );
+  if (!google)
+    await client.query(await readFile(new URL("../migrations/004_google_signin.sql", import.meta.url), "utf8"));
 } finally {
   await client.end();
 }
