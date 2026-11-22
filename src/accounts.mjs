@@ -4,6 +4,10 @@ import { OAuth2Client } from "google-auth-library";
 import { body, fail, name } from "./api.mjs";
 
 const derive = promisify(scrypt);
+// OAuth client IDs are public identifiers. Keep the app's registered client as
+// the default so deployments use the same audience as the sign-in button.
+export const googleClientId = () => process.env.GOOGLE_CLIENT_ID?.trim() ||
+  "147233286325-ohsfl4ro2kekg3a8uq8io9d8uqqfe7bd.apps.googleusercontent.com";
 const token = () => randomBytes(32).toString("hex");
 export const digest = (value) =>
   createHash("sha256").update(value).digest("hex");
@@ -142,13 +146,12 @@ export async function accountApi(db, request, path) {
   if (request.method !== "POST") fail(405, "Use POST for this action");
   const data = await body(request);
   if (path === "google") {
-    if (!process.env.GOOGLE_CLIENT_ID)
-      fail(503, "Google sign-in is not configured");
+    const clientId = googleClientId();
     let ticket;
     try {
-      ticket = await new OAuth2Client(process.env.GOOGLE_CLIENT_ID).verifyIdToken({
+      ticket = await new OAuth2Client(clientId).verifyIdToken({
         idToken: String(data.credential ?? ""),
-        audience: process.env.GOOGLE_CLIENT_ID,
+        audience: clientId,
       });
     } catch {
       fail(401, "Google sign-in could not be verified");

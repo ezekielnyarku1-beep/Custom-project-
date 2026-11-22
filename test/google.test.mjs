@@ -3,7 +3,16 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { OAuth2Client } from 'google-auth-library';
-import { accountApi } from '../src/accounts.mjs';
+import { accountApi, googleClientId } from '../src/accounts.mjs';
+
+test('Google configuration has a deployment default and accepts an override', (t) => {
+  const old = process.env.GOOGLE_CLIENT_ID;
+  t.after(() => { if (old === undefined) delete process.env.GOOGLE_CLIENT_ID; else process.env.GOOGLE_CLIENT_ID = old; });
+  delete process.env.GOOGLE_CLIENT_ID;
+  assert.equal(googleClientId(), '147233286325-ohsfl4ro2kekg3a8uq8io9d8uqqfe7bd.apps.googleusercontent.com');
+  process.env.GOOGLE_CLIENT_ID = ' custom-client ';
+  assert.equal(googleClientId(), 'custom-client');
+});
 
 test('Google login rejects unsafe email linking and accepts linked identities', async (t) => {
   const old = process.env.GOOGLE_CLIENT_ID;

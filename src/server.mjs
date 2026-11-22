@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { resolve, extname } from "node:path";
 import { loadEnvFile } from "node:process";
 import pg from "pg";
-import { accountApi, identity, startMailer } from "./accounts.mjs";
+import { accountApi, identity, startMailer, googleClientId } from "./accounts.mjs";
 import { workspaceApi } from "./workspace.mjs";
 import { api, fail } from "./api.mjs";
 
@@ -82,7 +82,7 @@ export async function handleRequest(request, response) {
     }
     health = request.method === "GET" && path === "/health";
     if (request.method === "GET" && path === "/api/auth/config")
-      return send(200, { googleClientId: process.env.GOOGLE_CLIENT_ID || null });
+      return send(200, { googleClientId: googleClientId() });
     if (!connectionString) fail(503, "The server is missing DATABASE_URL");
     if (health) {
       const { rows } = await database.query("SELECT 1 AS result");
