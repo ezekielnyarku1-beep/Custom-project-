@@ -21,6 +21,16 @@ export function name(value) {
 }
 
 export async function body(request) {
+  if(request.body!==undefined) {
+    let data=request.body;
+    if(Buffer.isBuffer(data))data=data.toString("utf8");
+    if(typeof data==="string") {
+      try {data=JSON.parse(data);}catch {fail(400,"Expected JSON");}
+    }
+    if(!data || typeof data!=="object" || Array.isArray(data))fail(400,"Expected a JSON object");
+    if(Buffer.byteLength(JSON.stringify(data))>1500000)fail(413,"Request is too large");
+    return data;
+  }
   let raw = "";
   request.setEncoding("utf8");
   for await (const chunk of request.iterator({ destroyOnReturn: false })) {

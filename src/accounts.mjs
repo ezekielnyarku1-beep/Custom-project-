@@ -99,7 +99,7 @@ async function matches(value, hash) {
 }
 function cookie(request, value, age) {
   const secure =
-    process.env.APP_URL?.startsWith("https://") || request.socket.encrypted;
+    process.env.VERCEL === "1" || process.env.APP_URL?.startsWith("https://") || request.socket.encrypted;
   return (
     "overview_session=" +
     value +

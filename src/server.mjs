@@ -19,9 +19,6 @@ const contentTypes = {
   ".js": "text/javascript",
   ".css": "text/css",
 };
-if (!connectionString) {
-  throw new Error("DATABASE_URL is required.");
-}
 
 const database = new pg.Pool({
   connectionString,
@@ -33,13 +30,13 @@ database.on("error", (error) => {
   console.error("Idle PostgreSQL connection failed", error.code ?? error.name);
 });
 
-startMailer(database);
+if (!process.env.VERCEL) startMailer(database);
 const attempts = new Map();
 setInterval(() => {
   for (const [ip, bucket] of attempts)
     if (bucket.until < Date.now()) attempts.delete(ip);
 }, 60000).unref();
-const server = createServer(async (request, response) => {
+export async function handleRequest(request, response) {
   const headers = {
     "Content-Type": "application/json",
     "Cache-Control": "no-store",
@@ -84,6 +81,7 @@ const server = createServer(async (request, response) => {
       return;
     }
     health = request.method === "GET" && path === "/health";
+    if (!connectionString) fail(503, "The server is missing DATABASE_URL");
     if (health) {
       const { rows } = await database.query("SELECT 1 AS result");
       return send(200, { postgres: rows[0].result });
@@ -147,9 +145,13 @@ const server = createServer(async (request, response) => {
   } finally {
     client?.release();
   }
-});
+}
 
-server.listen(
+const server = !process.env.VERCEL
+  ? createServer(handleRequest)
+  : null;
+
+if (server) server.listen(
   Number(process.env.PORT ?? process.argv[2] ?? 3000),
   "127.0.0.1",
   () => {

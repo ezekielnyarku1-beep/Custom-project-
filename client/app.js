@@ -7,20 +7,20 @@ const pages = {
     action: "Reset password",
   },
   login: {
-    title: "Welcome back",
-    subtitle: "Enter your details to sign in to your account.",
+    title: "Sign in to Overview",
+    subtitle: "Enter your account details to continue.",
     fields: ["email", "password"],
     action: "Sign in",
   },
   signup: {
-    title: "Create an account",
+    title: "Create your Overview account",
     subtitle: "Enter your details to get started.",
     fields: ["fullName", "email", "password", "confirmPassword"],
     action: "Create account",
   },
   "forgot-password": {
-    title: "Forgot password?",
-    subtitle: "Enter the email address for your account.",
+    title: "Reset your password",
+    subtitle: "Enter the email address for your Overview account.",
     fields: ["email"],
     action: "Send reset link",
   },
@@ -135,7 +135,7 @@ function renderAuthContent(page) {
     const forgot = link("forgot-password", pages["forgot-password"].title);
     forgot.className = "forgot";
     button.before(forgot);
-    footer.append("Don't have an account? ", link("signup", "Sign up"));
+    footer.append("New to Overview? ", link("signup", "Sign up"));
   } else {
     footer.append(link("login", "Back to login"));
   }
@@ -185,7 +185,12 @@ async function request(path, data) {
           body: JSON.stringify(data),
         },
   );
-  const result = await response.json();
+  if(!response.headers.get("content-type")?.includes("application/json")) {
+    throw new Error("The API returned an unexpected response (HTTP "+response.status+"). Check the deployment’s API routing and server configuration.");
+  }
+  let result;
+  try { result=await response.json(); }
+  catch { throw new Error("The API returned invalid JSON. Please retry or check the server logs."); }
   if (!response.ok)
     throw Object.assign(new Error(result.error ?? "Request failed"), {
       status: response.status,
@@ -438,7 +443,7 @@ function taskView(source) {
   );
   function stageControl(t) {
     if (!managing() && t.assignee !== state.user.id) return esc(t.stage);
-    return `<select data-stage="${t.id}" aria-label="Status for ${esc(t.name)}">${options(stages, t.stage)}</select>`;
+    return `<select data-stage="${t.id}" ${pendingMoves.has(t.id) ? "disabled" : ""} aria-label="Status for ${esc(t.name)}">${options(stages, t.stage)}</select>`;
   }
   const open = (t) => action("task", t.name, t.id, "text-button");
   const person = (t) =>
@@ -477,7 +482,7 @@ function taskView(source) {
                   .filter((t) => t.stage === s)
                   .map(
                     (t) =>
-                      `<article class="card" draggable="${managing() || t.assignee === state.user.id}" data-drag-task="${t.id}">${open(t)}<p>${priorityLabels[t.priority]} · ${person(t)}</p><small>${date(t.due_date)}</small>${stageControl(t)}</article>`,
+                      `<article class="card" draggable="${!pendingMoves.has(t.id) && (managing() || t.assignee === state.user.id)}" data-drag-task="${t.id}">${open(t)}<p>${priorityLabels[t.priority]} · ${person(t)}</p><small>${date(t.due_date)}</small>${stageControl(t)}</article>`,
                   )
                   .join("") || none("No tasks")
               }</section>`,
@@ -712,7 +717,69 @@ const screens = {
   notifications: notificationsPage,
   settings,
 };
-function paint() {
+function elementKey(node) {
+  if (node.nodeType !== 1) return node.nodeName;
+  const task = node.matches("article,tr")
+    ? node.querySelector('[data-action="task"]')
+    : null;
+  return (
+    node.tagName +
+    "|" +
+    (node.id ||
+      (task ? "task:" + task.dataset.id : "") ||
+      node.getAttribute("data-stage") ||
+      node.getAttribute("data-filter") ||
+      node.getAttribute("data-drop-stage") ||
+      (node.dataset.action
+        ? node.dataset.action + ":" + node.dataset.id
+        : "") ||
+      node.getAttribute("href") ||
+      node.className)
+  );
+}
+function updateChildren(target, source) {
+  const available = Array.from(target.childNodes);
+  let cursor = target.firstChild;
+  for (const desired of Array.from(source.childNodes)) {
+    const index = available.findIndex(
+      (node) => elementKey(node) === elementKey(desired),
+    );
+    const current =
+      index < 0 ? desired.cloneNode(true) : available.splice(index, 1)[0];
+    if (current !== cursor) target.insertBefore(current, cursor);
+    if (index >= 0) {
+      if (current.nodeType === 3) {
+        if (current.nodeValue !== desired.nodeValue)
+          current.nodeValue = desired.nodeValue;
+      } else if (current.nodeType === 1 && !current.isEqualNode(desired)) {
+        for (const attr of Array.from(current.attributes))
+          if (!desired.hasAttribute(attr.name))
+            current.removeAttribute(attr.name);
+        for (const attr of Array.from(desired.attributes))
+          if (current.getAttribute(attr.name) !== attr.value)
+            current.setAttribute(attr.name, attr.value);
+        updateChildren(current, desired);
+      }
+      if (current.tagName === "SELECT") current.value = desired.value;
+      if (current.tagName === "INPUT") {
+        current.value = desired.value;
+        current.checked = desired.checked;
+      }
+    }
+    cursor = current.nextSibling;
+  }
+  for (const node of available) node.remove();
+}
+function updateMarkup(target, html, incremental) {
+  if (!incremental) {
+    target.innerHTML = html;
+    return;
+  }
+  const fragment = document.createElement("template");
+  fragment.innerHTML = html;
+  updateChildren(target, fragment.content);
+}
+function paint(incremental = false) {
   root.removeAttribute("aria-busy");
   const current = page(),
     u = state.user,
@@ -724,12 +791,16 @@ function paint() {
   document.querySelector("#space-name").textContent = u.workspace_name;
   document.querySelector("#space-role").textContent = u.role + " · Workspace";
   document.querySelector("#current-view").textContent = labels[current];
-  document.querySelector("nav").innerHTML = Object.entries(labels)
-    .map(
-      ([id, label]) =>
-        `<a class="nav-link" href="#/${id}" ${current === id ? 'aria-current="page"' : ""}>${label}${id === "notifications" && unread ? ` <b>${unread}</b>` : ""}</a>`,
-    )
-    .join("");
+  updateMarkup(
+    document.querySelector("nav"),
+    Object.entries(labels)
+      .map(
+        ([id, label]) =>
+          `<a class="nav-link" href="#/${id}" ${current === id ? 'aria-current="page"' : ""}>${label}${id === "notifications" && unread ? ` <b>${unread}</b>` : ""}</a>`,
+      )
+      .join(""),
+    incremental,
+  );
   let primary = "";
   if (managing() && (current === "home" || current === "projects"))
     primary = project
@@ -747,9 +818,12 @@ function paint() {
         ? "Team Activity"
         : labels[current];
   document.title = title + " | Overview";
-  document.querySelector("#content").innerHTML =
+  updateMarkup(
+    document.querySelector("#content"),
     `<div class="section-heading"><div><h1>${esc(title)}</h1><p class="subtitle">${esc(project ? project.description : descriptions[current])}</p></div>${primary}</div>` +
-    screens[current]();
+      screens[current](),
+    incremental,
+  );
 }
 function dialog(title, html) {
   const modal = document.querySelector("dialog");
@@ -758,6 +832,7 @@ function dialog(title, html) {
   if (!modal.open) modal.showModal();
 }
 let lastSynced = 0;
+const pendingMoves = new Map();
 async function refresh(preserveDrafts = false) {
   const seq = ++version;
   let next;
@@ -772,6 +847,10 @@ async function refresh(preserveDrafts = false) {
   }
   if (seq !== version) return;
   state = next;
+  for (const [id, move] of pendingMoves) {
+    const task = byId(state.tasks, id);
+    if (task) task.stage = move.stage;
+  }
   lastSynced = Date.now();
   root.removeAttribute("aria-busy");
   if (root.className !== "dashboard") {
@@ -783,7 +862,7 @@ async function refresh(preserveDrafts = false) {
     !preserveDrafts ||
     !root.querySelector('#content form[data-dirty="true"]')
   )
-    paint();
+    paint(true);
 }
 function auth(pageName) {
   root.className = "auth";
@@ -1268,7 +1347,9 @@ function taskCards(rows) {
               (managing() || t.assignee === state.user.id
                 ? '<label>Status<select data-stage="' +
                   t.id +
-                  '">' +
+                  '"' +
+                  (pendingMoves.has(t.id) ? " disabled" : "") +
+                  ">" +
                   options(stages, t.stage) +
                   "</select></label>"
                 : esc(t.stage)) +
@@ -1351,17 +1432,49 @@ function attachmentPanel(t, edit) {
 }
 let undoMove;
 async function moveTask(task, stage) {
-  if (task.stage === stage) return;
-  await mutate("workspace/task", {
-    id: task.id,
-    project_id: task.project_id,
-    stage,
-    expected_stage: task.stage,
-  });
+  if (task.stage === stage || pendingMoves.has(task.id)) return;
+  const previous = task.stage;
+  const workspace = state.user.workspace;
+  const destination = location.hash;
+  pendingMoves.set(task.id, { stage });
+  task.stage = stage;
+  paint(true);
+  saveFeedback("Saving task...");
+  try {
+    await request("workspace/task", {
+      id: task.id,
+      project_id: task.project_id,
+      stage,
+      expected_stage: previous,
+    });
+  } catch (error) {
+    pendingMoves.delete(task.id);
+    if (state?.user.workspace === workspace) {
+      const current = byId(state.tasks, task.id);
+      if (current) current.stage = previous;
+      if (root.className === "dashboard") paint(true);
+    }
+    saveFeedback("Task could not be saved. Your change was reverted.");
+    throw error;
+  }
+  pendingMoves.delete(task.id);
+  if (state?.user.workspace !== workspace || root.className !== "dashboard")
+    return;
+  saveFeedback(pendingMoves.size ? "Saving tasks..." : "Task saved");
+  try {
+    await refresh(true);
+  } catch (error) {
+    if (error.status === 401) {
+      handleError(error);
+      return;
+    }
+    saveFeedback("Task saved. Refresh to load the latest totals.");
+  }
+  if (location.hash !== destination || root.className !== "dashboard") return;
   undoMove = {
     id: task.id,
     project_id: task.project_id,
-    stage: task.stage,
+    stage: previous,
     expected_stage: stage,
   };
   const notice = document.createElement("div");
@@ -1372,6 +1485,20 @@ async function moveTask(task, stage) {
     " " +
     action("undo-move", "Undo", "", "text-button");
   root.querySelector("#content")?.prepend(notice);
+}
+let feedbackTimer;
+function saveFeedback(message) {
+  clearTimeout(feedbackTimer);
+  let status = document.getElementById("save-feedback");
+  if (!status) {
+    status = document.createElement("div");
+    status.id = "save-feedback";
+    status.setAttribute("role", "status");
+    document.body.append(status);
+  }
+  status.textContent = message;
+  if (!pendingMoves.size)
+    feedbackTimer = setTimeout(() => status.remove(), 5000);
 }
 root.addEventListener("dragstart", (event) => {
   const card = event.target.closest('[data-drag-task][draggable="true"]');
