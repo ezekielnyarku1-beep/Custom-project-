@@ -24,5 +24,6 @@ test("frontend reports non-JSON deployment errors and preserves JSON authenticat
 test("Vercel routes API and health to the shared backend",async()=>{
   const config=JSON.parse(await readFile(new URL("../vercel.json",import.meta.url),"utf8"));
   assert.equal(config.outputDirectory,"client/dist");
-  assert.deepEqual(config.rewrites,[{source:"/health",destination:"/api/health"}]);
+  assert.equal(config.rewrites[0].source,"/api/:path*");
+  assert.equal(config.rewrites[0].destination,"/api/index?__overview_path=/api/:path*");
 });

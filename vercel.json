@@ -4,6 +4,7 @@
   "buildCommand": "npm run build && npm --prefix client run build",
   "outputDirectory": "client/dist",
   "rewrites": [
-    { "source": "/health", "destination": "/api/health" }
+    { "source": "/api/:path*", "destination": "/api/index?__overview_path=/api/:path*" },
+    { "source": "/health", "destination": "/api/index?__overview_path=/health" }
   ]
 }
