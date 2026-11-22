@@ -207,6 +207,15 @@ const labels = {
   notifications: "Notifications",
   settings: "Settings",
 };
+const navPaths = {
+  home: "M3 10l9-7 9 7v10h-6v-7H9v7H3z",
+  projects: "M3 6h7l2 2h9v12H3z",
+  "my-tasks": "M5 4h14v16H5z M8 12l3 3 5-6",
+  teams: "M14 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0z M3 20a8 8 0 0 1 16 0 M17 6a3 3 0 0 1 0 6 M19 15q3 1 3 5",
+  activity: "M2 12h5l3-8 4 16 3-8h5",
+  notifications: "M5 17h14l-2-3V9a5 5 0 0 0-10 0v5z M10 20q2 2 4 0",
+  settings: "M3 7h5m4 0h9 M3 17h11m4 0h3 M8 4h4v6H8z M14 14h4v6h-4z",
+};
 const descriptions = {
   home: "Here’s what’s happening across your projects today.",
   projects: "Track tasks, owners, and deadlines.",
@@ -797,7 +806,7 @@ function paint(incremental = false) {
     Object.entries(labels)
       .map(
         ([id, label]) =>
-          `<a class="nav-link" href="#/${id}" ${current === id ? 'aria-current="page"' : ""}>${label}${id === "notifications" && unread ? ` <b>${unread}</b>` : ""}</a>`,
+          `<a class="nav-link" href="#/${id}" ${current === id ? 'aria-current="page"' : ""}><svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="${navPaths[id]}"/></svg>${label}${id === "notifications" && unread ? ` <b>${unread}</b>` : ""}</a>`,
       )
       .join(""),
     incremental,
