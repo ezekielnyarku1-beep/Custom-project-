@@ -1,5 +1,6 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
+import { OAuth2Client } from "google-auth-library";
 import { body, fail, name } from "./api.mjs";
 
 const derive = promisify(scrypt);
@@ -90,7 +91,12 @@ async function hashPassword(value) {
   return salt + "." + (await derive(value, salt, 64)).toString("hex");
 }
 async function matches(value, hash) {
-  if (typeof value !== "string" || value.length > 256) return false;
+  if (
+    typeof value !== "string" ||
+    value.length > 256 ||
+    typeof hash !== "string"
+  )
+    return false;
   const [salt, key] = hash.split(".");
   return timingSafeEqual(
     await derive(value, salt, 64),
@@ -135,6 +141,60 @@ async function newSession(db, request, user, workspace) {
 export async function accountApi(db, request, path) {
   if (request.method !== "POST") fail(405, "Use POST for this action");
   const data = await body(request);
+  if (path === "google") {
+    if (!process.env.GOOGLE_CLIENT_ID)
+      fail(503, "Google sign-in is not configured");
+    let ticket;
+    try {
+      ticket = await new OAuth2Client(process.env.GOOGLE_CLIENT_ID).verifyIdToken({
+        idToken: String(data.credential ?? ""),
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+    } catch {
+      fail(401, "Google sign-in could not be verified");
+    }
+    const payload = ticket.getPayload();
+    if (!payload?.email || payload.email_verified !== true)
+      fail(401, "A verified Google email address is required");
+    const address = email(payload.email);
+    const googleSub = String(payload.sub);
+    let user = (
+      await db.query(
+        "SELECT id FROM accounts WHERE google_sub=$1 OR email=$2 ORDER BY (google_sub=$1) DESC LIMIT 1",
+        [googleSub, address],
+      )
+    ).rows[0];
+    if (!user) {
+      user = (
+        await db.query(
+          "INSERT INTO accounts(email,name,google_sub,password_hash) VALUES($1,$2,$3,NULL) RETURNING id",
+          [address, name(payload.name || payload.email), googleSub],
+        )
+      ).rows[0];
+      const {
+        rows: [space],
+      } = await db.query(
+        "INSERT INTO workspaces(name) VALUES('Personal workspace') RETURNING id",
+      );
+      await db.query("INSERT INTO members VALUES($1,$2,'Owner')", [
+        space.id,
+        user.id,
+      ]);
+    } else {
+      await db.query(
+        "UPDATE accounts SET google_sub=$1 WHERE id=$2 AND google_sub IS NULL",
+        [googleSub, user.id],
+      );
+    }
+    const {
+      rows: [membership],
+    } = await db.query(
+      "SELECT workspace_id FROM members WHERE account_id=$1 ORDER BY (role='Owner') DESC LIMIT 1",
+      [user.id],
+    );
+    if (!membership) fail(409, "This account has no workspace");
+    return newSession(db, request, user.id, membership.workspace_id);
+  }
   if (path === "signup") {
     const address = email(data.email);
     const password = await hashPassword(data.password);

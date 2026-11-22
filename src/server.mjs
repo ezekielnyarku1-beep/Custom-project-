@@ -94,7 +94,7 @@ export async function handleRequest(request, response) {
     )
       fail(403, "Expected a same-origin JSON request");
     if (
-      ["login", "signup", "forgot-password", "reset-password"].some(
+      ["login", "signup", "google", "forgot-password", "reset-password"].some(
         (action) => path === "/api/auth/" + action,
       )
     ) {
