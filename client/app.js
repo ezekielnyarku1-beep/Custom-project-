@@ -1,4 +1,5 @@
 const root = document.querySelector("#root");
+const loadingScreen = root.querySelector(".skeleton-screen");
 const pages = {
   "reset-password": {
     title: "Reset password",
@@ -753,6 +754,8 @@ function elementKey(node) {
     node.tagName +
     "|" +
     (node.id ||
+      node.dataset.form ||
+      node.getAttribute("name") ||
       (task ? "task:" + task.dataset.id : "") ||
       node.getAttribute("data-stage") ||
       node.getAttribute("data-filter") ||
@@ -869,7 +872,10 @@ async function refresh(preserveDrafts = false) {
   syncingVersion = seq;
   let next;
   try {
-    if (!state) showLoadingSkeleton();
+    if (!state) {
+      root.className = "skeleton-app";
+      root.replaceChildren(loadingScreen);
+    }
     root.setAttribute("aria-busy", "true");
     next = await request("workspace/state");
   } catch (error) {
@@ -897,6 +903,7 @@ async function refresh(preserveDrafts = false) {
     root.className = "dashboard";
     root.replaceChildren(template("dashboard"));
     root.querySelector(".wordmark").textContent = "Overview";
+    setDrawer(false);
   }
   if (
     !preserveDrafts ||
@@ -911,60 +918,6 @@ function auth(pageName) {
   root.querySelector(".wordmark").textContent = "Overview – Inpact";
   document.title = pages[pageName].title + " | Overview";
   renderAuthContent(pageName);
-}
-function showLoadingSkeleton() {
-  root.setAttribute("aria-busy", "true");
-  const pageSkeleton = `
-    <div class="section-heading">
-      <div>
-        <div class="skeleton skeleton-heading"></div>
-        <div class="skeleton skeleton-subtitle"></div>
-      </div>
-    </div>
-    <div class="skeleton-stats">
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-    </div>
-    <div class="skeleton skeleton-banner"></div>
-    <div class="skeleton-grid">
-      <div class="skeleton skeleton-card large"></div>
-      <div class="skeleton skeleton-card large"></div>
-      <div class="skeleton skeleton-card large"></div>
-    </div>
-  `;
-  if (state && root.className === "dashboard") {
-    root.querySelector("#content").innerHTML = pageSkeleton;
-    return;
-  }
-  root.className = "skeleton-app";
-  root.innerHTML = `
-    <div class="skeleton-screen" role="status" aria-label="Loading workspace">
-      <div class="skeleton-sidebar">
-        <div class="skeleton skeleton-logo"></div>
-        <div class="skeleton skeleton-block"></div>
-        <div class="skeleton skeleton-row"></div>
-        <div class="skeleton skeleton-row short"></div>
-        <div class="skeleton skeleton-row"></div>
-      </div>
-      <div class="skeleton-page">
-        <div class="skeleton skeleton-heading"></div>
-        <div class="skeleton-stats">
-          <div class="skeleton skeleton-card"></div>
-          <div class="skeleton skeleton-card"></div>
-          <div class="skeleton skeleton-card"></div>
-          <div class="skeleton skeleton-card"></div>
-        </div>
-        <div class="skeleton skeleton-banner"></div>
-        <div class="skeleton-grid">
-          <div class="skeleton skeleton-card large"></div>
-          <div class="skeleton skeleton-card large"></div>
-          <div class="skeleton skeleton-card large"></div>
-        </div>
-      </div>
-    </div>
-  `;
 }
 const mobileNavigation = matchMedia("(max-width:45rem)");
 function setDrawer(open) {
@@ -1077,7 +1030,7 @@ function editor(type, id) {
     const edit = managing() || t.assignee === state.user.id;
     const info = edit
       ? form("task", fields, id ? "Save task" : "Create task", id)
-      : `<p>${esc(t.description)}</p><ul>${(t.checklist ?? []).map((item) => `<li>${item.done ? "?" : "?"} ${esc(item.text)}</li>`).join("")}</ul>` +
+      : `<p>${esc(t.description)}</p><ul>${(t.checklist ?? []).map((item) => `<li>${item.done ? "Completed" : "Open"} · ${esc(item.text)}</li>`).join("")}</ul>` +
         none(
           t.stage +
             " · " +
@@ -1190,7 +1143,7 @@ root.addEventListener("click", async (event) => {
     return;
   }
   const btn = event.target.closest("[data-action]");
-  if (!btn) return;
+  if (!btn || btn.disabled) return;
   const { action: type, id } = btn.dataset;
   btn.disabled = true;
   try {
@@ -1231,6 +1184,52 @@ root.addEventListener("click", async (event) => {
       if (confirm("Remove this member and clear their assignments?")) {
         await mutate("workspace/member", { id, remove: true });
         root.querySelector("dialog").close();
+      }
+    } else if (type === "add-check") {
+      const list = btn.closest("fieldset").querySelector("[data-checklist]");
+      if (list.children.length >= 100)
+        throw Error("Use up to 100 checklist items");
+      list.insertAdjacentHTML("beforeend", checklistRow());
+      list.lastElementChild.querySelector("input[type=text]").focus();
+    } else if (type === "remove-check") btn.closest("[data-check-row]").remove();
+    else if (type === "save-view")
+      dialog(
+        "Save current view",
+        form("save-view", input("name", "View name"), "Save view"),
+      );
+    else if (type === "delete-view" && confirm("Delete this saved view?")) {
+      await mutate("workspace/delete-view", { name: id });
+      delete filters.saved;
+      paint();
+    } else if (type === "undo-move" && undoMove) {
+      const move = undoMove;
+      await mutate("workspace/task", move);
+      if (undoMove === move) undoMove = null;
+    } else if (type === "download" || type === "delete-attachment") {
+      const file = byId(state.attachments, id),
+        task = byId(state.tasks, file.node_id);
+      const values = {
+        id: task.id,
+        project_id: task.project_id,
+        attachment_id: id,
+      };
+      if (type === "download") {
+        const result = await request("workspace/download", values);
+        const bytes = Uint8Array.from(
+          atob(result.content.replace(/\s/g, "")),
+          (c) => c.charCodeAt(0),
+        );
+        const url = URL.createObjectURL(
+          new Blob([bytes], { type: "application/octet-stream" }),
+        );
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = result.name;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      } else if (confirm("Remove this attachment?")) {
+        await mutate("workspace/delete-attachment", values);
+        refreshTaskDialog(task.id);
       }
     } else editor(type, id);
   } catch (error) {
@@ -1273,7 +1272,6 @@ root.addEventListener("change", async (event) => {
     try {
       await moveTask(t, el.value);
     } catch (error) {
-      el.value = t.stage;
       handleError(error);
     } finally {
       el.disabled = false;
@@ -1353,17 +1351,19 @@ root.addEventListener("submit", async (event) => {
   }
   if (type === "password") path = "auth/password";
   const destination = location.hash;
+  const modal = f.closest("dialog");
   try {
     const result = await mutate(path, d);
-    if (location.hash !== destination || root.className !== "dashboard") return;
+    if (location.hash !== destination || root.className !== "dashboard" ||
+        (modal && (!modal.open || !f.isConnected))) return;
     if (type === "invite")
       dialog(
         "Invitation ready",
         `<p>Share this code privately with ${esc(d.email)}. They can enter it under Teams after signing in.</p><label>Invitation code<input readonly value="${esc(result.code)}"></label>`,
       );
-    else if (type === "comment") refreshTaskDialog(id);
+    else if (type === "comment") refreshTaskDialog(id, true);
     else {
-      root.querySelector("dialog[open]")?.close();
+      modal?.close();
       if (type === "project" && !id) location.hash = "/projects/" + result.id;
       else {
         saveFeedback("Changes saved.");
@@ -1490,7 +1490,7 @@ function taskDetailFields(t) {
     "</fieldset>"
   );
 }
-function refreshTaskDialog(id) {
+function refreshTaskDialog(id, commentPosted = false) {
   const modal = root.querySelector("dialog[open]");
   if (!modal) return;
   const draft = modal.querySelector('form[data-form="task"]');
@@ -1498,6 +1498,8 @@ function refreshTaskDialog(id) {
   if ((draft ?? comment)?.dataset.id !== id) return;
   editor("task", id);
   if (draft) modal.querySelector('form[data-form="task"]')?.replaceWith(draft);
+  if (comment && !commentPosted)
+    modal.querySelector('form[data-form="comment"]')?.replaceWith(comment);
 }
 function attachmentPanel(t, edit) {
   if (!t.id) return "";
@@ -1560,9 +1562,10 @@ async function moveTask(task, stage) {
       handleError(error);
       return;
     }
+    if (root.className === "dashboard" && state?.user.workspace === workspace) paint(true);
     saveFeedback("Task saved. Refresh to load the latest totals.");
   }
-  if (location.hash !== destination || root.className !== "dashboard") return;
+  if (location.hash !== destination || state?.user.workspace !== workspace || root.className !== "dashboard") return;
   undoMove = {
     id: task.id,
     project_id: task.project_id,
@@ -1570,6 +1573,7 @@ async function moveTask(task, stage) {
     expected_stage: stage,
   };
   const notice = document.createElement("div");
+  root.querySelector('[data-action="undo-move"]')?.closest(".notice")?.remove();
   notice.className = "notice";
   notice.setAttribute("role", "status");
   notice.innerHTML =
@@ -1613,64 +1617,6 @@ root.addEventListener("drop", async (event) => {
   if (!task) return;
   try {
     await moveTask(task, column.dataset.dropStage);
-  } catch (error) {
-    handleError(error);
-  }
-});
-root.addEventListener("click", async (event) => {
-  const btn = event.target.closest("[data-action]");
-  if (!btn) return;
-  const { action: type, id } = btn.dataset;
-  try {
-    if (type === "add-check") {
-      const list = btn.closest("fieldset").querySelector("[data-checklist]");
-      if (list.children.length >= 100)
-        throw Error("Use up to 100 checklist items");
-      list.insertAdjacentHTML("beforeend", checklistRow());
-      list.lastElementChild.querySelector("input[type=text]").focus();
-    }
-    if (type === "remove-check") btn.closest("[data-check-row]").remove();
-    if (type === "save-view")
-      dialog(
-        "Save current view",
-        form("save-view", input("name", "View name"), "Save view"),
-      );
-    if (type === "delete-view" && confirm("Delete this saved view?")) {
-      await mutate("workspace/delete-view", { name: id });
-      delete filters.saved;
-      paint();
-    }
-    if (type === "undo-move" && undoMove) {
-      await mutate("workspace/task", undoMove);
-      undoMove = null;
-    }
-    if (type === "download" || type === "delete-attachment") {
-      const file = byId(state.attachments, id),
-        task = byId(state.tasks, file.node_id);
-      const values = {
-        id: task.id,
-        project_id: task.project_id,
-        attachment_id: id,
-      };
-      if (type === "download") {
-        const result = await request("workspace/download", values);
-        const bytes = Uint8Array.from(
-          atob(result.content.replace(/\s/g, "")),
-          (c) => c.charCodeAt(0),
-        );
-        const url = URL.createObjectURL(
-          new Blob([bytes], { type: "application/octet-stream" }),
-        );
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = result.name;
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
-      } else if (confirm("Remove this attachment?")) {
-        await mutate("workspace/delete-attachment", values);
-        refreshTaskDialog(task.id);
-      }
-    }
   } catch (error) {
     handleError(error);
   }
