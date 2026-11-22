@@ -239,8 +239,23 @@ let state,
 const route = () => location.hash.replace(/^#\/?/, "").split("/");
 const page = () => (Object.hasOwn(labels, route()[0]) ? route()[0] : "home");
 const managing = () => state.user.role !== "Member";
-const byId = (rows, id) => rows.find((item) => item.id === id);
-const projectTasks = (id) => state.tasks.filter((t) => t.project_id === id);
+const indexes = new WeakMap();
+function byId(rows, id) {
+  if (!indexes.has(rows)) indexes.set(rows, new Map(rows.map(item => [item.id, item])));
+  return indexes.get(rows).get(id);
+}
+let indexedTasks, tasksByProject;
+function projectTasks(id) {
+  if (indexedTasks !== state.tasks) {
+    tasksByProject = new Map();
+    for (const task of state.tasks) {
+      if (!tasksByProject.has(task.project_id)) tasksByProject.set(task.project_id, []);
+      tasksByProject.get(task.project_id).push(task);
+    }
+    indexedTasks = state.tasks;
+  }
+  return tasksByProject.get(id) ?? [];
+}
 const tasksDone = (tasks) => tasks.filter((t) => t.stage === "Done").length;
 const progress = (id) => {
   const percent = byId(state.projects, id)?.percent;
@@ -268,20 +283,10 @@ const day = (offset = 0) => {
   ].join("-");
 };
 const overdue = (t) => t.due_date && t.due_date < day() && t.stage !== "Done";
-const date = (v) =>
-  v
-    ? new Date(v.length === 10 ? v + "T12:00:00" : v).toLocaleDateString(
-        undefined,
-        { month: "short", day: "numeric", year: "numeric" },
-      )
-    : "No deadline";
-const when = (v) =>
-  new Date(v).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+const deadlineFormat = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
+const activityFormat = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const date = (v) => v ? deadlineFormat.format(new Date(v.length === 10 ? v + "T12:00:00" : v)) : "No deadline";
+const when = (v) => activityFormat.format(new Date(v));
 const esc = (value) =>
   String(value ?? "").replace(
     /[&<>"']/g,
@@ -326,6 +331,15 @@ function feed(rows) {
     ? `<div class="feed card">${rows.map((e) => `<article><span class="avatar" aria-hidden="true">${esc(e.name.slice(0, 1))}</span><div><strong>${esc(e.name)}</strong> ${esc(e.message)}<small>${anchor("projects/" + e.project_id, byId(state.projects, e.project_id)?.name ?? "Project")} · ${when(e.created_at)}</small></div></article>`).join("")}</div>`
     : none("No activity to show.");
 }
+const taskBatchSize = 40;
+const taskLimits = new Map();
+function taskBatch(key, rows, renderRows) {
+  const limit = taskLimits.get(key) ?? taskBatchSize;
+  const more = rows.length > limit
+    ? `<button type="button" class="secondary more" data-more="${key}">Show more tasks (${rows.length - limit} remaining)</button>`
+    : "";
+  return renderRows(rows.slice(0, limit)) + more;
+}
 function home() {
   const { projects, tasks, activity } = state;
   const deadlines = [
@@ -356,7 +370,7 @@ function home() {
     ]) +
     panel(
       "Needs your attention",
-      taskCards(
+      taskBatch("attention",
         tasks
           .filter(
             (t) =>
@@ -365,6 +379,7 @@ function home() {
               t.stage === "In review",
           )
           .sort((a, b) => Number(overdue(b)) - Number(overdue(a))),
+        taskCards,
       ),
     ) +
     panel(
@@ -488,20 +503,19 @@ function taskView(source) {
           .map(
             (s) =>
               `<section data-drop-stage="${s}"><h2>${s} <small>${rows.filter((t) => t.stage === s).length}</small></h2>${
-                rows
-                  .filter((t) => t.stage === s)
+                taskBatch(s, rows.filter((t) => t.stage === s), batch => batch
                   .map(
                     (t) =>
                       `<article class="card" draggable="${!pendingMoves.has(t.id) && (managing() || t.assignee === state.user.id)}" data-drag-task="${t.id}">${open(t)}<p>${priorityLabels[t.priority]} · ${person(t)}</p><small>${date(t.due_date)}</small>${stageControl(t)}</article>`,
                   )
-                  .join("") || none("No tasks")
+                  .join("") || none("No tasks"))
               }</section>`,
           )
           .join("")}</div>`
-      : `<div class="mobile-task-list">${taskCards(rows)}</div><div class="desktop-task-list">` +
+      : taskBatch("list", rows, batch => `<div class="mobile-task-list">${taskCards(batch)}</div><div class="desktop-task-list">` +
         table(
           ["Task", "Project", "Priority", "Assignee", "Status", "Due date"],
-          rows.map((t) => [
+          batch.map((t) => [
             open(t),
             anchor(
               "projects/" + t.project_id,
@@ -514,7 +528,7 @@ function taskView(source) {
           ]),
           "No tasks match this view.",
         ) +
-        "</div>")
+        "</div>"))
   );
 }
 function myTasks() {
@@ -668,6 +682,8 @@ function settings() {
             "Save workspace",
           )
         : "");
+  else if (tab === "appearance")
+    html = `<label>Theme <select data-theme-picker>${options([["light","Light"],["dark","Dark"],["system","System"]], themePreference)}</select></label>`;
   else if (tab === "preferences")
     html = form(
       "preferences",
@@ -703,6 +719,7 @@ function settings() {
   const panes = [
     ["", "Personal profile"],
     ["workspace", "Workspace settings"],
+    ["appearance", "Appearance"],
     ["preferences", "Notification preferences"],
     ["security", "Account security"],
   ];
@@ -748,16 +765,18 @@ function elementKey(node) {
   );
 }
 function updateChildren(target, source) {
-  const available = Array.from(target.childNodes);
+  const available = new Map();
+  for (const node of Array.from(target.childNodes).reverse()) {
+    const key = elementKey(node);
+    if (!available.has(key)) available.set(key, []);
+    available.get(key).push(node);
+  }
   let cursor = target.firstChild;
   for (const desired of Array.from(source.childNodes)) {
-    const index = available.findIndex(
-      (node) => elementKey(node) === elementKey(desired),
-    );
-    const current =
-      index < 0 ? desired.cloneNode(true) : available.splice(index, 1)[0];
+    const existing = available.get(elementKey(desired))?.pop();
+    const current = existing ?? desired.cloneNode(true);
     if (current !== cursor) target.insertBefore(current, cursor);
-    if (index >= 0) {
+    if (existing) {
       if (current.nodeType === 3) {
         if (current.nodeValue !== desired.nodeValue)
           current.nodeValue = desired.nodeValue;
@@ -772,13 +791,14 @@ function updateChildren(target, source) {
       }
       if (current.tagName === "SELECT") current.value = desired.value;
       if (current.tagName === "INPUT") {
-        current.value = desired.value;
+        if (current.value !== desired.value) current.value = desired.value;
         current.checked = desired.checked;
       }
     }
     cursor = current.nextSibling;
   }
-  for (const node of available) node.remove();
+  for (const nodes of available.values())
+    for (const node of nodes) node.remove();
 }
 function updateMarkup(target, html, incremental) {
   if (!incremental) {
@@ -809,7 +829,7 @@ function paint(incremental = false) {
           `<a class="nav-link" href="#/${id}" ${current === id ? 'aria-current="page"' : ""}><svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="${navPaths[id]}"/></svg>${label}${id === "notifications" && unread ? ` <b>${unread}</b>` : ""}</a>`,
       )
       .join(""),
-    incremental,
+    true,
   );
   let primary = "";
   if (managing() && (current === "home" || current === "projects"))
@@ -842,9 +862,11 @@ function dialog(title, html) {
   if (!modal.open) modal.showModal();
 }
 let lastSynced = 0;
+let syncingVersion;
 const pendingMoves = new Map();
 async function refresh(preserveDrafts = false) {
   const seq = ++version;
+  syncingVersion = seq;
   let next;
   try {
     if (!state) showLoadingSkeleton();
@@ -854,8 +876,16 @@ async function refresh(preserveDrafts = false) {
     if (seq !== version) return;
     root.removeAttribute("aria-busy");
     throw error;
+  } finally {
+    if (syncingVersion === seq) syncingVersion = undefined;
   }
   if (seq !== version) return;
+  if (next.user.id !== state?.user.id) {
+    try {
+      applyTheme(localStorage.getItem("overview.theme." + next.user.id));
+      localStorage.setItem("overview.theme", themePreference);
+    } catch {}
+  }
   state = next;
   for (const [id, move] of pendingMoves) {
     const task = byId(state.tasks, id);
@@ -936,16 +966,49 @@ function showLoadingSkeleton() {
     </div>
   `;
 }
+const mobileNavigation = matchMedia("(max-width:45rem)");
+function setDrawer(open) {
+  const sidebar = root.querySelector("#workspace-sidebar");
+  if (!sidebar) return;
+  const toggle = root.querySelector(".menu-toggle");
+  const restoreFocus = sidebar.contains(document.activeElement);
+  sidebar.classList.toggle("is-open", open);
+  sidebar.inert = mobileNavigation.matches && !open;
+  root.querySelector(".dashboard-main").inert = open;
+  toggle.setAttribute("aria-expanded", String(open));
+  if (open) {
+    sidebar.setAttribute("role", "dialog");
+    sidebar.setAttribute("aria-modal", "true");
+    sidebar.querySelector(".drawer-close").focus();
+  } else {
+    sidebar.removeAttribute("role");
+    sidebar.removeAttribute("aria-modal");
+    if (mobileNavigation.matches && restoreFocus) toggle.focus();
+  }
+}
+mobileNavigation.addEventListener("change", () => setDrawer(false));
+root.addEventListener("keydown", (event) => {
+  const sidebar = event.target.closest(".sidebar.is-open");
+  if (!sidebar) return;
+  if (event.key === "Escape") setDrawer(false);
+  if (event.key !== "Tab") return;
+  const controls = sidebar.querySelectorAll("button:enabled, a[href]");
+  const first = controls[0], last = controls[controls.length - 1];
+  if (event.shiftKey && document.activeElement === first || !event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+  }
+});
 async function render() {
   const requested = route()[0];
-  if (lastRoute !== location.hash) {
+  const changed = lastRoute !== location.hash;
+  if (changed) {
+    taskLimits.clear();
     filters = {};
     lastRoute = location.hash;
   }
   root.querySelector("dialog[open]")?.close();
-  const menu = root.querySelector(".menu-toggle");
-  menu?.setAttribute("aria-expanded", "false");
-  root.querySelector(".sidebar-menu")?.classList.remove("is-open");
+  setDrawer(false);
   if (Object.hasOwn(pages, requested)) {
     version++;
     auth(requested);
@@ -953,7 +1016,12 @@ async function render() {
   }
   if (state && root.className === "dashboard") {
     paint();
-    if (Date.now() - lastSynced > 30000) refresh(true).catch(handleError);
+    if (changed) {
+      document.querySelector("#content").focus({ preventScroll: true });
+      window.scrollTo(0, 0);
+    }
+    if (Date.now() - lastSynced > 30000 && syncingVersion === undefined)
+      refresh(true).catch(handleError);
     return;
   }
   try {
@@ -1095,22 +1163,30 @@ root.addEventListener("click", async (event) => {
   }
   const menu = event.target.closest(".menu-toggle");
   if (menu) {
-    const open = root
-      .querySelector(".sidebar-menu")
-      .classList.toggle("is-open");
-    menu.setAttribute("aria-expanded", open);
-    menu.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+    setDrawer(true);
     return;
   }
+  if (event.target.closest(".drawer-close, .drawer-backdrop, .sidebar.is-open a[href]")) setDrawer(false);
   const tab = event.target.closest("[data-filter-key]");
+  const more = event.target.closest("[data-more]");
+  if (more) {
+    const key = more.dataset.more;
+    const previous = taskLimits.get(key) ?? taskBatchSize;
+    taskLimits.set(key, previous + taskBatchSize);
+    const section = more.closest("[data-drop-stage], .block, #content");
+    paint(true);
+    const list = key === "list"
+      ? section.querySelector(matchMedia("(max-width:45rem)").matches ? ".mobile-task-list" : ".desktop-task-list")
+      : section;
+    const firstNew = list?.querySelectorAll('[data-action="task"]')[previous];
+    firstNew?.focus({ preventScroll: true });
+    return;
+  }
   if (tab) {
+    if (tab.getAttribute("aria-pressed") === "true") return;
+    taskLimits.clear();
     filters[tab.dataset.filterKey] = tab.dataset.value;
-    paint();
-    root
-      .querySelector(
-        `[data-filter-key="${tab.dataset.filterKey}"][aria-pressed="true"]`,
-      )
-      ?.focus();
+    paint(true);
     return;
   }
   const btn = event.target.closest("[data-action]");
@@ -1178,17 +1254,24 @@ function handleError(error) {
 }
 root.addEventListener("change", async (event) => {
   const el = event.target;
+  if (el.matches("[data-theme-picker]")) {
+    applyTheme(el.value);
+    try {
+      localStorage.setItem("overview.theme." + state.user.id, themePreference);
+      localStorage.setItem("overview.theme", themePreference);
+    } catch { saveFeedback("Theme applied for this session. Browser storage is unavailable."); }
+    return;
+  }
   if (el.dataset.filter) {
+    taskLimits.clear();
     filters[el.dataset.filter] = el.value;
-    paint();
-    root.querySelector(`[data-filter="${el.dataset.filter}"]`)?.focus();
+    paint(true);
   }
   if (el.dataset.stage) {
     const t = byId(state.tasks, el.dataset.stage);
     el.disabled = true;
     try {
       await moveTask(t, el.value);
-      root.querySelector(`[data-stage="${t.id}"]`)?.focus();
     } catch (error) {
       el.value = t.stage;
       handleError(error);
@@ -1283,11 +1366,7 @@ root.addEventListener("submit", async (event) => {
       root.querySelector("dialog[open]")?.close();
       if (type === "project" && !id) location.hash = "/projects/" + result.id;
       else {
-        const p = document.createElement("p");
-        p.className = "notice";
-        p.setAttribute("role", "status");
-        p.textContent = "Changes saved.";
-        root.querySelector("#content").prepend(p);
+        saveFeedback("Changes saved.");
       }
     }
   } catch (error) {
@@ -1298,7 +1377,9 @@ root.addEventListener("submit", async (event) => {
   }
 });
 window.addEventListener("hashchange", render);
-window.addEventListener("pageshow", render);
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) render();
+});
 root.addEventListener("input", (event) => {
   const form = event.target.closest("#content form");
   if (form) form.dataset.dirty = "true";
@@ -1597,9 +1678,10 @@ root.addEventListener("click", async (event) => {
 root.addEventListener("change", async (event) => {
   const el = event.target;
   if (el.matches("[data-saved-view]")) {
+    taskLimits.clear();
     const view = state.savedViews.find((v) => v.name === el.value);
     filters = view ? { ...view.filters, saved: view.name } : {};
-    paint();
+    paint(true);
   }
   if (el.dataset.upload) {
     const file = el.files[0];
@@ -1629,3 +1711,4 @@ root.addEventListener("change", async (event) => {
     }
   }
 });
+render();

@@ -4,8 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Overview</title>
+    <script>
+      const systemTheme = matchMedia("(prefers-color-scheme: dark)");
+      let themePreference = "system";
+      function applyTheme(preference) {
+        themePreference = ["light", "dark"].includes(preference) ? preference : "system";
+        document.documentElement.dataset.theme = themePreference === "system"
+          ? (systemTheme.matches ? "dark" : "light")
+          : themePreference;
+      }
+      try { themePreference = localStorage.getItem("overview.theme"); } catch {}
+      applyTheme(themePreference);
+      systemTheme.addEventListener("change", () => applyTheme(themePreference));
+    </script>
     <link rel="stylesheet" href="./src/styles.css" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&amp;display=swap" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&amp;display=swap" />
   </head>
   <body>
     <main id="root" aria-busy="true">
@@ -65,12 +79,10 @@
       </div>
     </template>
     <template id="dashboard">
-      <aside class="sidebar">
+      <aside class="sidebar" id="workspace-sidebar" aria-label="Workspace menu">
         <div class="sidebar-header">
-          <div class="dashboard-brand"><span class="brand-monogram" aria-hidden="true">O</span><strong class="wordmark"></strong></div>
-          <button class="menu-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="sidebar-menu">
-            <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
-          </button>
+          <div class="dashboard-brand"><strong class="wordmark"></strong></div>
+          <button class="drawer-close" type="button" aria-label="Close menu">&#215;</button>
         </div>
         <div class="sidebar-menu" id="sidebar-menu">
           <div class="workspace"><strong id="space-name"></strong><small id="space-role"></small></div>
@@ -78,8 +90,12 @@
           <button class="text-button" data-action="logout">Log out</button>
         </div>
       </aside>
+      <div class="drawer-backdrop" aria-hidden="true"></div>
       <div class="dashboard-main">
         <header class="topbar">
+          <button class="menu-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="workspace-sidebar">
+            <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
+          </button>
           <p class="breadcrumb">Workspace <span>/</span> <strong id="current-view"></strong></p>
           <form id="search-form" role="search"><label class="search"><input name="q" type="search" placeholder="Search projects, tasks…" aria-label="Search projects and tasks, press Enter" /></label></form>
           <div class="top-links"><a href="#/notifications">Notifications</a> · <a href="#/settings">Account</a></div>
