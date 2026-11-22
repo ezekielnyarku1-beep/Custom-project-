@@ -54,25 +54,35 @@ button:disabled { cursor: wait; opacity: .7; }
 .password-input { padding-right: 4.5rem; }
 .password-toggle { position: absolute; inset: .25rem .25rem .25rem auto; padding: 0 .75rem; background: transparent; color: var(--blue); font-size: .8rem; }
 .auth, .dashboard { min-height: 100svh; }
-.auth { display: grid; grid-template-columns: 46% minmax(0, 1fr); }
+.auth { --blue: #07877f; --ink: #153638; --muted: #617675; --canvas: #f4f6f3; display: grid; grid-template-columns: 45% minmax(0, 1fr); background: var(--canvas); }
 
-.brand {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 3rem;
-  padding: var(--gutter);
-  background: var(--blue);
-  color: var(--paper);
-}
+.brand { position: relative; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; justify-content: space-between; gap: 3rem; padding: 3.5rem clamp(2rem,4.7vw,5.6rem) 2rem; background: #143735; color: #fff; }
+.brand::after { content: ""; position: absolute; z-index: -1; width: 48rem; aspect-ratio: 1; right: -21rem; bottom: -30rem; border: 1px solid #d1af3d40; border-radius: 50%; box-shadow: 0 0 0 6rem #ffffff03,0 0 0 10rem #ffffff03; }
+.auth-brand { display: flex; align-items: center; gap: .9rem; }
+.auth-brand .wordmark { font-size: 1.1rem; letter-spacing: -.02em; }
+.auth-brand small { display: block; color: #b7cecb; font-size: .8rem; margin-top: .15rem; }
+.brand-monogram { display: grid; place-items: center; flex: none; width: 2.7rem; height: 2.7rem; border-radius: .75rem; color: #143735; background: #f4cf40; font-weight: 700; font-size: 1.4rem; }
+.brand-company { margin-top: 1.75rem; color: #b7cecb; font-size: 1.2rem; }
+.brand-footer { color: #a8c3bf; font-size: .8rem; }
 
 .wordmark { font-size: 1.85rem; letter-spacing: -.06em; }
-.tagline { margin-bottom: 1.45rem; font-size: .75rem; letter-spacing: .16em; font-weight: 600; }
-.headline { font-size: clamp(3.2rem, 5.6vw, 6rem); line-height: 1.04; letter-spacing: -.055em; font-weight: 500; }
-.headline span { color: var(--mint); }
+.tagline { margin-bottom: 1.5rem; color: #f4cf40; text-transform: uppercase; font-size: .8rem; letter-spacing: .1em; font-weight: 700; }
+.headline { max-width: 28rem; font-size: clamp(2.7rem,3.5vw,4rem); line-height: 1.05; letter-spacing: -.055em; font-weight: 700; text-wrap: balance; }
 
-.form-panel { display: grid; place-items: center; min-width: 0; padding: 2rem var(--gutter); }
-.form-content { width: min(100%, 26rem); min-width: 0; }
+
+.form-panel { display: grid; place-items: center; min-width: 0; padding: 3rem 2rem; }
+.form-content { width: min(100%, 30.5rem); min-width: 0; padding: 3rem; border: 1px solid var(--line); border-radius: 1rem; background: #fffefa; box-shadow: 0 1.5rem 4rem #14373508; }
+.auth h1 { font-size: 2rem; font-weight: 700; letter-spacing: -.04em; }
+.auth-eyebrow { color: #007d78; text-transform: uppercase; letter-spacing: .12em; font-size: .78rem; font-weight: 700; margin-bottom: 1.25rem; }
+.auth .subtitle { font-size: .95rem; margin-bottom: 2rem; }
+.auth .field { grid-template-columns: minmax(0,1fr) auto; align-items: center; }
+.auth .field .input-wrap,.auth .field small { grid-column: 1 / -1; }
+.auth .forgot { font-size: .8rem; }
+.auth label { font-size: .85rem; font-weight: 600; }
+.auth input { min-height: 3.3rem; border-radius: .6rem; }
+.auth form > button { min-height: 3.25rem; border-radius: .6rem; }
+.auth .form-footer { margin-top: 3rem; font-size: .8rem; }
+.auth-note { margin-top: 1rem; font-size: .75rem; color: var(--muted); text-align: center; }
 h1 { font-size: clamp(1.85rem, 3vw, 2.5rem); line-height: 1.15; letter-spacing: -.05em; }
 .subtitle, .form-footer { color: var(--muted); }
 .subtitle { margin: .7rem 0 2.25rem; }
@@ -220,7 +230,7 @@ dialog::backdrop { background: rgb(24 32 43 / 35%); }
 #dialog-title { overflow-wrap: anywhere; min-width: 0; }
 
 @media (prefers-reduced-motion: no-preference) {
-  .form-content, .dashboard-content { animation: arrive .22s ease-out; }
+  .dashboard-content { animation: arrive .22s ease-out; }
   button, input { transition: background-color .15s, border-color .15s, opacity .15s; }
   @keyframes arrive {
     from { opacity: 0; transform: translateY(.4rem); }
@@ -238,8 +248,12 @@ dialog::backdrop { background: rgb(24 32 43 / 35%); }
 @media (max-width: 45rem) {
   :root { --gutter: 1.25rem; }
   .auth { grid-template-columns: minmax(0, 1fr); }
-  .brand { display: none; }
-  .auth, .form-panel { min-height: 100dvh; }
+  .brand { padding: 1.25rem; gap: 0; }
+  .brand-message,.brand-footer,.brand::after { display: none; }
+  .auth .form-content { padding: 1.5rem; }
+  .auth h1 { font-size: 1.65rem; }
+  .auth { min-height: 100dvh; grid-template-rows: auto 1fr; }
+  .form-panel { min-height: 0; }
   .form-panel { align-content: center; padding: 1.25rem var(--gutter); }
   .subtitle { margin-bottom: 1.5rem; }
   form { gap: 1rem; }
@@ -416,7 +430,7 @@ button,input,select,textarea,.pill { border-radius: var(--control-radius); }
 .tabs button[aria-pressed=true] { border-color: var(--blue); }
 .notice { background: var(--amber-soft); border-left: 3px solid var(--mint); }
 .card h3 a { line-height: 1.5; }
-.headline { font-size: clamp(2.5rem,4.6vw,5rem); line-height: 1.12; }
+
 @media(prefers-reduced-motion:no-preference) {
   .notice,[data-error] { animation: feedback-in .18s ease-out; }
   @keyframes feedback-in { from { opacity: 0; transform: translateY(-.2rem); } to { opacity: 1; transform: translateY(0); } }

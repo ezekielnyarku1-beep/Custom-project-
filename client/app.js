@@ -124,6 +124,7 @@ function setButtonLoading(button) {
 function renderAuthContent(page) {
   const { title, subtitle, fields, action } = pages[page];
   root.querySelector("h1").textContent = title;
+  root.querySelector(".auth-eyebrow").textContent=page==="login"?"Welcome back":page==="signup"?"Get started":"Account recovery";
   root.querySelector(".subtitle").textContent = subtitle;
   const form = root.querySelector("form");
   const button = form.querySelector("button");
@@ -132,9 +133,9 @@ function renderAuthContent(page) {
   for (const name of fields) button.before(field(name, page));
 
   if (page === "login") {
-    const forgot = link("forgot-password", pages["forgot-password"].title);
+    const forgot = link("forgot-password", "Forgot password?");
     forgot.className = "forgot";
-    button.before(forgot);
+    form.querySelector('label[for="password"]').after(forgot);
     footer.append("New to Overview? ", link("signup", "Sign up"));
   } else {
     footer.append(link("login", "Back to login"));
@@ -865,9 +866,10 @@ async function refresh(preserveDrafts = false) {
     paint(true);
 }
 function auth(pageName) {
+  root.removeAttribute("aria-busy");
   root.className = "auth";
   root.replaceChildren(template("auth"));
-  root.querySelector(".wordmark").textContent = "Overview";
+  root.querySelector(".wordmark").textContent = "Overview – Inpact";
   document.title = pages[pageName].title + " | Overview";
   renderAuthContent(pageName);
 }

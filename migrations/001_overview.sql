@@ -43,8 +43,6 @@ CREATE TABLE progress (
     PRIMARY KEY (node_id, area_id)
 );
 CREATE INDEX progress_by_area ON progress (area_id);
-
--- Keep structural links fixed. Each child joins an existing container, so cycles cannot form.
 CREATE FUNCTION check_node_structure() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_OP = 'UPDATE' THEN
@@ -88,8 +86,6 @@ END;
 $$;
 CREATE TRIGGER progress_pair BEFORE INSERT OR UPDATE OF node_id, area_id ON progress
 FOR EACH ROW EXECUTE FUNCTION check_progress_pair();
-
--- Serialize area/activity creation in each project before filling missing pairs.
 CREATE FUNCTION initialize_progress() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     PERFORM 1 FROM projects WHERE id = NEW.project_id FOR NO KEY UPDATE;
