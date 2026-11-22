@@ -3,11 +3,6 @@
   "framework": null,
   "buildCommand": "npm run build && npm --prefix client run build",
   "outputDirectory": "client/dist",
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 60
-    }
-  },
   "rewrites": [
     { "source": "/health", "destination": "/api/health" }
   ]
